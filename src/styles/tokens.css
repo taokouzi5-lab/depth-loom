@@ -1,0 +1,64 @@
+:root {
+  color-scheme: dark;
+
+  --bg: #0a0a0b;
+  --bg-raised: #111113;
+  --surface: rgba(24, 23, 21, 0.72);
+  --surface-strong: rgba(32, 31, 28, 0.9);
+  --line: rgba(242, 239, 233, 0.09);
+  --line-strong: rgba(242, 239, 233, 0.18);
+
+  --text: #f2efe9;
+  --text-muted: #a09a90;
+  --text-dim: #8b857b;
+
+  --accent: #c9a46a;
+  --accent-strong: #e3c08a;
+  --accent-soft: rgba(201, 164, 106, 0.13);
+  --accent-line: rgba(201, 164, 106, 0.42);
+
+  --danger: #d98978;
+  --danger-soft: rgba(217, 137, 120, 0.1);
+
+  --focus: #e3c08a;
+
+  --font-sans:
+    "Inter", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC",
+    "Microsoft YaHei", sans-serif;
+  --font-mono:
+    "SFMono-Regular", "Cascadia Code", Consolas, "Liberation Mono", monospace;
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-display: clamp(2.6rem, 1.6rem + 3.6vw, 4.75rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-full: 999px;
+
+  --shadow-panel:
+    0 24px 70px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 420ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --header-height: 76px;
+  --stage-inset: clamp(16px, 4vw, 56px);
+  --panel-width: min(780px, calc(100vw - 32px));
+}
