@@ -1,16 +1,29 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import type { CreateDepthClient } from './lib/depth/protocol'
 import { ImageError } from './lib/image/errors'
 
 const mocks = vi.hoisted(() => ({
   decodeImage: vi.fn(),
+  retryDepth: vi.fn(),
 }))
 
 vi.mock('./lib/image/decode', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./lib/image/decode')>()
   return { ...actual, decodeImage: mocks.decodeImage }
 })
+
+vi.mock('./hooks/useDepthEstimation', () => ({
+  useDepthEstimation: () => ({
+    status: 'idle',
+    progress: null,
+    mode: null,
+    depth: null,
+    error: null,
+    retry: mocks.retryDepth,
+  }),
+}))
 
 vi.mock('./components/stage/DepthStage', () => ({
   default: ({
@@ -32,6 +45,15 @@ type DecodedImage = {
   height: number
   fileName: string
   fileSize: number
+}
+
+const createDepthClient: CreateDepthClient = vi.fn(() => ({
+  estimate: vi.fn(),
+  dispose: vi.fn(),
+}))
+
+function renderApp() {
+  return render(<App createDepthClient={createDepthClient} />)
 }
 
 function makeFile(name = 'demo.jpg', type = 'image/jpeg'): File {
@@ -78,13 +100,13 @@ describe('App', () => {
   })
 
   it('starts on the empty state', () => {
-    render(<App />)
+    renderApp()
     expect(screen.getByRole('heading', { name: /让一张照片/ })).toBeInTheDocument()
     expect(screen.queryByTestId('depth-stage')).not.toBeInTheDocument()
   })
 
   it('decodes a dropped image and lazy-mounts the stage', async () => {
-    render(<App />)
+    renderApp()
 
     dropFile(makeFile())
 
@@ -96,7 +118,7 @@ describe('App', () => {
   })
 
   it('accepts an image from the file input', async () => {
-    const { container } = render(<App />)
+    const { container } = renderApp()
     const input = container.querySelector('input[type="file"]')
     expect(input).not.toBeNull()
     if (!input) return
@@ -108,7 +130,7 @@ describe('App', () => {
   })
 
   it('accepts a pasted image', async () => {
-    render(<App />)
+    renderApp()
 
     fireEvent.paste(window, {
       clipboardData: { files: [makeFile('pasted.webp', 'image/webp')] },
@@ -119,7 +141,7 @@ describe('App', () => {
   })
 
   it('rejects an unsupported file without calling the decoder', async () => {
-    render(<App />)
+    renderApp()
 
     dropFile(makeFile('animation.gif', 'image/gif'))
 
@@ -130,7 +152,7 @@ describe('App', () => {
   })
 
   it('keeps the current stage when a replacement image fails to decode', async () => {
-    render(<App />)
+    renderApp()
     dropFile(makeFile())
     await screen.findByTestId('depth-stage')
 
@@ -150,7 +172,7 @@ describe('App', () => {
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise)
 
-    render(<App />)
+    renderApp()
     dropFile(makeFile('first.jpg'))
     dropFile(makeFile('second.jpg'))
 
@@ -176,7 +198,7 @@ describe('App', () => {
   })
 
   it('resets the stage from the control bar', async () => {
-    render(<App />)
+    renderApp()
     dropFile(makeFile())
     const stage = await screen.findByTestId('depth-stage')
     expect(stage).toHaveTextContent('reset:0')

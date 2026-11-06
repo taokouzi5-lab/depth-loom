@@ -26,5 +26,8 @@ e2e/test-results
 *.local
 *.tsbuildinfo
 
+# generated ORT runtime (copied by scripts/copy-ort.mjs at dev/build time)
+public/ort/
+
 # local visual QA
 .tmp/

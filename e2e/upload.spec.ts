@@ -16,7 +16,7 @@ test('uploads a photo, mounts the 3D stage, and survives a drag', async ({ page 
     }
   })
 
-  await page.goto('./')
+  await page.goto('./?depth=off')
 
   const fileInput = page.locator('input[type="file"]')
   await fileInput.setInputFiles(fixture)

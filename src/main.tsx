@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { createDepthWorker } from './lib/depth/workerClient'
 import './styles/tokens.css'
 import './styles/global.css'
 
@@ -11,6 +12,6 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <App createDepthClient={createDepthWorker} />
   </StrictMode>,
 )

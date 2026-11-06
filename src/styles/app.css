@@ -144,9 +144,51 @@
   text-transform: uppercase;
 }
 
-.dl-busy-pill {
+.dl-depth-scan {
   position: absolute;
   z-index: 3;
+  inset: 8% 12%;
+  overflow: hidden;
+  border-radius: 14px;
+  pointer-events: none;
+}
+
+.dl-depth-scan::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-line),
+    transparent
+  );
+  box-shadow: 0 0 18px var(--accent-soft);
+  content: "";
+  animation: dl-depth-scan 2.4s var(--ease-soft) infinite;
+}
+
+@keyframes dl-depth-scan {
+  0% {
+    top: 6%;
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    top: 94%;
+    opacity: 0;
+  }
+}
+
+.dl-busy-pill {
+  position: absolute;
+  z-index: 4;
   top: 18px;
   left: 50%;
   padding: 9px 16px;
@@ -163,7 +205,7 @@
 
 .dl-toast {
   position: absolute;
-  z-index: 4;
+  z-index: 6;
   top: 16px;
   left: 50%;
   display: flex;
@@ -269,6 +311,10 @@
 
   .dl-stage-wrap {
     inset: 0 12px calc(176px + env(safe-area-inset-bottom));
+  }
+
+  .dl-depth-scan {
+    inset: 6% 8%;
   }
 
   .dl-busy-pill {

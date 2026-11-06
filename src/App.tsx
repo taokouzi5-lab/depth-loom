@@ -7,11 +7,18 @@ import {
   type ChangeEvent,
 } from 'react'
 import { AppHeader } from './components/AppHeader'
-import { ControlBar } from './components/controls/ControlBar'
+import {
+  ControlBar,
+  type ViewMode,
+} from './components/controls/ControlBar'
+import { DepthStatus } from './components/depth/DepthStatus'
+import { DepthView } from './components/depth/DepthView'
 import { StageErrorBoundary } from './components/stage/StageErrorBoundary'
 import { UploadZone, type UploadNotice } from './components/upload/UploadZone'
+import { useDepthEstimation } from './hooks/useDepthEstimation'
 import { useFileDrop } from './hooks/useFileDrop'
 import { usePasteImage } from './hooks/usePasteImage'
+import type { CreateDepthClient } from './lib/depth/protocol'
 import { decodeImage, type ProcessedImage } from './lib/image/decode'
 import {
   IMAGE_ERROR_MESSAGES,
@@ -27,11 +34,16 @@ type ImageState =
   | { status: 'empty' }
   | { status: 'ready'; image: ProcessedImage }
 
-export default function App() {
+type AppProps = {
+  createDepthClient: CreateDepthClient
+}
+
+export default function App({ createDepthClient }: AppProps) {
   const [imageState, setImageState] = useState<ImageState>({ status: 'empty' })
   const [isDecoding, setIsDecoding] = useState(false)
   const [notice, setNotice] = useState<UploadNotice | null>(null)
   const [resetSignal, setResetSignal] = useState(0)
+  const [view, setView] = useState<ViewMode>('original')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const latestJob = useRef(0)
 
@@ -62,6 +74,7 @@ export default function App() {
       if (latestJob.current !== job) return
       setImageState({ status: 'ready', image })
       setResetSignal(0)
+      setView('original')
     } catch (error) {
       if (latestJob.current !== job) return
       const code: ImageErrorCode =
@@ -90,6 +103,18 @@ export default function App() {
   usePasteImage(handleFiles)
 
   const isReady = imageState.status === 'ready'
+  // `?depth=off` is a lightweight original-only mode. It also lets upload E2E
+  // tests skip the ~50 MB model download they do not need.
+  const isDepthDisabled =
+    new URLSearchParams(window.location.search).get('depth') === 'off'
+  const depth = useDepthEstimation(
+    isReady && !isDepthDisabled ? imageState.image : null,
+    createDepthClient,
+  )
+  const activeView: ViewMode =
+    view === 'depth' && depth.status === 'ready' && depth.depth
+      ? 'depth'
+      : 'original'
 
   return (
     <div className="dl-app">
@@ -117,6 +142,27 @@ export default function App() {
                 <DepthStage image={imageState.image} resetSignal={resetSignal} />
               </Suspense>
             </StageErrorBoundary>
+
+            {activeView === 'depth' &&
+              depth.depth &&
+              imageState.status === 'ready' && (
+                <DepthView image={imageState.image} depth={depth.depth} />
+              )}
+
+            {(depth.status === 'loading' || depth.status === 'estimating') && (
+              <div className="dl-depth-scan" aria-hidden="true" />
+            )}
+
+            <DepthStatus
+              status={depth.status}
+              progress={depth.progress}
+              mode={depth.mode}
+              error={depth.error}
+              onRetry={() => {
+                setView('original')
+                depth.retry()
+              }}
+            />
 
             {isDecoding && (
               <div className="dl-busy-pill" role="status">
@@ -154,6 +200,9 @@ export default function App() {
           width={imageState.image.width}
           height={imageState.image.height}
           isBusy={isDecoding}
+          view={activeView}
+          onViewChange={setView}
+          isDepthReady={depth.status === 'ready'}
           onReset={() => setResetSignal((value) => value + 1)}
           onBrowse={openFilePicker}
         />

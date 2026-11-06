@@ -9,10 +9,12 @@ const BASE_PATH = '/depth-loom/'
  */
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  // The real-model depth test downloads ~50 MB and runs CPU inference. Running
+  // upload tests concurrently would compete for the same server and memory.
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  workers: 1,
   timeout: 120_000,
   expect: { timeout: 20_000 },
   reporter: process.env.CI

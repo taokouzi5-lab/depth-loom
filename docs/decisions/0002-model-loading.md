@@ -53,14 +53,38 @@ Latency, availability, and privacy claims. A local file also makes the demo
 reproducible offline after first load, and keeps the "no upload" promise easy to
 verify in the network panel.
 
+## Implementation notes (M2, 2026-11-07)
+
+- Transformers.js 4.3.2 imports `onnxruntime-web/webgpu`, which registers only
+  the WebGPU execution provider. The Vite alias in `vite.config.ts` maps it to
+  `onnxruntime-web/all` so the WASM execution provider exists for fallback.
+- `env.localModelPath` must be a **path** (for example `/depth-loom/models/`),
+  not an absolute URL. The local-file metadata check treats HTTP URLs as remote;
+  with an absolute URL it fails to discover `preprocessor_config.json`, and the
+  pipeline later crashes with `this.processor is not a function`. The hook passes
+  `new URL('models/', document.baseURI).pathname`.
+- WebGPU is attempted only after `navigator.gpu.requestAdapter()` returns an
+  adapter. Headless Chromium has none; it goes straight to WASM. The WASM path
+  uses the asyncify runtime and the q8 weights.
+- `env.useBrowserCache` is disabled by default in the worker. CacheStorage writes
+  for the 27 MB q8 model can fail with `ERR_CACHE_WRITE_FAILURE` and surface as a
+  fatal "network error" in Chromium profiles. The in-memory pipeline still means
+  switching images never reloads the weights.
+- ONNX Runtime runtime files are copied into `public/ort/` on `predev` and
+  `prebuild`, because Transformers.js expects a WASM directory and the project
+  must not rely on jsDelivr.
+- The real-model E2E test estimates depth on the synthetic fixture and asserts
+  that the depth canvas has real grayscale variation.
+
 ## Consequences
 
-- The repository carries ~45 MB of model files. This is intentional and below
+- The repository carries ~46.4 MB of model files. This is intentional and below
   GitHub's 100 MB per-file limit.
-- First load fetches 19 MB (WebGPU) or 26 MB (WASM) from the app origin. It is
-  cached by the browser; the UI shows byte progress.
-- Model license (Apache-2.0) text and attribution ship next to the weights.
-- A failed model load must show an explicit error and a retry action. Silent
+- First load fetches 19.1 MB (WebGPU/q4f16) or 27.3 MB (WASM/q8) of weights plus
+  26–28 MB of ONNX Runtime WASM from the app origin. The UI shows byte progress.
+- Model license (Apache-2.0) text, attribution, sizes, and SHA-256 values ship
+  next to the weights in `MODEL_INFO.md`.
+- A failed model load shows an explicit error and a retry action. Silent
   fallback is not allowed.
-- The model is only for relative depth. README must state it is not suitable for
+- The model is only for relative depth. README states it is not suitable for
   measurement, medical, or safety-critical use.

@@ -95,7 +95,9 @@ SOFTWARE.
 ```
 
 The full Apache-2.0 text for Transformers.js and the Depth Anything V2 Small
-model will be included in the model directory in M2, alongside the ONNX weights.
+model is included at
+`public/models/depth-anything-v2-small/LICENSE`, alongside the ONNX weights and
+the provenance/checksum file `MODEL_INFO.md`.
 
 ## Images
 

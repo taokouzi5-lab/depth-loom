@@ -20,13 +20,26 @@ File
   → validate (type, size)
   → decode + EXIF orient (createImageBitmap)
   → resize to ≤1024px longest edge (canvas)
-  → [M2] depth worker (Depth Anything V2 Small)
-  → [M2] per-image min/max normalize → depth texture
-  → [M3] CPU vertex displacement → Three.js scene
+  → depth worker:
+       ImageData → RawImage → Depth Anything V2 Small
+       → predicted_depth (interpolated to the input size)
+       → per-image min/max normalize → Float32Array
+  → depth view / [M3] CPU vertex displacement → Three.js scene
   → render / export
 ```
 
-M1 stops after resize and renders the flat image on a plane.
+M1 renders the flat image on a plane. M2 adds the worker depth pass and the
+depth-map view; the Three.js mesh is still flat until M3.
+
+The worker keeps a single pipeline instance. The first image pays the
+model/ORT load; subsequent images reuse the in-memory weights. The transfer to
+the main thread is an `ArrayBuffer` (zero-copy) and contains normalized
+`Float32Array` values plus dimensions.
+
+Model files live in `public/models/depth-anything-v2-small/` and are committed.
+ONNX Runtime WASM binaries are copied from `node_modules/onnxruntime-web/dist`
+into `public/ort/` by `scripts/copy-ort.mjs` on `predev`/`prebuild`; they are
+generated artifacts and are not committed.
 
 ## Module boundaries
 
@@ -34,8 +47,10 @@ M1 stops after resize and renders the flat image on a plane.
 |---|---|---|
 | UI shell | `src/App.tsx`, `src/components` | Upload affordances, states, accessible chrome |
 | Image pipeline | `src/lib/image` | Validation, EXIF-aware decode, resize |
+| Depth pipeline | `src/lib/depth` | Worker protocol, ONNX/model config, normalization |
 | Three stage | `src/lib/three` | Camera fit, orbit math, renderer lifecycle |
-| Hooks | `src/hooks` | Window drag/drop and paste listeners |
+| Hooks | `src/hooks` | Upload listeners, depth worker state machine |
+| UI components | `src/components` | Upload, stage, depth view/status, controls |
 | Design system | `src/styles` | Tokens, reset, motion, responsive rules |
 | Docs | `docs` | Architecture and decision records |
 
@@ -76,13 +91,16 @@ but keeps its `WebGLRenderer`, avoiding WebGL context churn.
 ## Testing strategy
 
 - **Unit (Vitest):** validation, resize math, decode options, camera fit,
-  orbit clamping, plane geometry.
+  orbit clamping, plane geometry, depth normalization/RGBA conversion.
 - **Component (Testing Library):** upload entry points, error presentation,
-  app state transitions. The WebGL stage is mocked.
-- **E2E (Playwright, M5):** real upload → stage canvas → depth view, desktop
-  and 375px mobile.
+  app state transitions, view switch, depth status, and the depth hook state
+  machine with an injected fake client.
+- **E2E (Playwright):** real upload → stage canvas → depth estimate → depth-map
+  view, plus a real-model run on desktop. The 375px upload path is covered;
+  mobile depth is deferred to a later E2E pass.
 - Coverage threshold: 80% lines/statements/functions on `src/lib` and
-  `src/hooks`; the WebGL renderer glue is excluded and verified in-browser.
+  `src/hooks`; the WebGL renderer glue, the depth worker, and the Worker client
+  are excluded and verified in-browser.
 
 ## Decisions
 
