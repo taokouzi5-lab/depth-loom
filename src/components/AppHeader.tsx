@@ -1,4 +1,9 @@
+﻿import { useI18n } from '../lib/i18n/useI18n'
+
 export function AppHeader() {
+  const { locale, setLocale, t } = useI18n()
+  const nextLocale = locale === 'zh' ? 'en' : 'zh'
+
   return (
     <header className="dl-header">
       <div className="dl-wordmark">
@@ -16,10 +21,20 @@ export function AppHeader() {
       <div className="dl-header__meta">
         <span className="dl-status">
           <span className="dl-status__dot" aria-hidden="true" />
-          本地处理 · 不上传
+          {t.header.privacy}
         </span>
+        <button
+          type="button"
+          className="dl-lang"
+          onClick={() => setLocale(nextLocale)}
+          aria-label={t.header.switchLabel}
+          title={t.header.switchLabel}
+        >
+          {locale === 'zh' ? 'EN' : '中文'}
+        </button>
         <span className="dl-header__license">MIT</span>
       </div>
     </header>
   )
 }
+

@@ -8,11 +8,7 @@ const fixture = path.join(
   'landscape.png',
 )
 
-test('estimates depth locally and renders the depth map', async ({ page }, testInfo) => {
-  test.skip(
-    testInfo.project.name !== 'desktop-chromium',
-    'Real-model depth is verified on desktop; mobile covered later.',
-  )
+test('estimates depth locally and renders the depth map', async ({ page }) => {
   test.slow()
 
   const consoleErrors: string[] = []
@@ -49,9 +45,22 @@ test('estimates depth locally and renders the depth map', async ({ page }, testI
   await expect(page.getByText('1.50×')).toBeVisible()
   await expect(page.locator('canvas.dl-canvas')).toBeVisible()
 
+  await page.getByRole('button', { name: '导出', exact: true }).click()
+  const videoDownloadPromise = page.waitForEvent('download')
+  await page.getByRole('menuitem', { name: '3 秒 WebM' }).click()
+  const videoDownload = await videoDownloadPromise
+  expect(videoDownload.suggestedFilename()).toMatch(/-loop\.webm$/)
+  await expect(page.getByText('WebM 已导出')).toBeVisible({ timeout: 30_000 })
+
   await depthButton.click()
   const depthCanvas = page.locator('canvas.dl-depth-canvas')
   await expect(depthCanvas).toBeVisible()
+
+  await page.getByRole('button', { name: '导出', exact: true }).click()
+  const depthPngDownloadPromise = page.waitForEvent('download')
+  await page.getByRole('menuitem', { name: 'PNG 截图' }).click()
+  const depthPngDownload = await depthPngDownloadPromise
+  expect(depthPngDownload.suggestedFilename()).toMatch(/-depth\.png$/)
 
   const stats = await depthCanvas.evaluate((element) => {
     const canvas = element as HTMLCanvasElement

@@ -1,4 +1,4 @@
-import {
+﻿import {
   lazy,
   Suspense,
   useCallback,
@@ -20,13 +20,13 @@ import { useDepthEstimation } from './hooks/useDepthEstimation'
 import { useFileDrop } from './hooks/useFileDrop'
 import { usePasteImage } from './hooks/usePasteImage'
 import type { CreateDepthClient } from './lib/depth/protocol'
+import { canvasToPng, downloadBlob } from './lib/export/download'
+import { useI18n } from './lib/i18n/useI18n'
 import { decodeImage, type ProcessedImage } from './lib/image/decode'
-import {
-  IMAGE_ERROR_MESSAGES,
-  ImageError,
-  type ImageErrorCode,
-} from './lib/image/errors'
+import { ImageError, type ImageErrorCode } from './lib/image/errors'
 import { validateImageFile } from './lib/image/validate'
+import type { SampleImage } from './lib/samples'
+import type { ImageStage } from './lib/three/stageTypes'
 import './styles/app.css'
 
 const DepthStage = lazy(() => import('./components/stage/DepthStage'))
@@ -39,14 +39,32 @@ type AppProps = {
   createDepthClient: CreateDepthClient
 }
 
+function exportBaseName(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, '') || 'depth-loom'
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : '未知错误'
+}
+
+type ExportFeedback = {
+  kind: 'info' | 'error'
+  text: string
+}
+
 export default function App({ createDepthClient }: AppProps) {
+  const { t } = useI18n()
   const [imageState, setImageState] = useState<ImageState>({ status: 'empty' })
   const [isDecoding, setIsDecoding] = useState(false)
+  const [isFetchingSample, setIsFetchingSample] = useState(false)
   const [notice, setNotice] = useState<UploadNotice | null>(null)
   const [resetSignal, setResetSignal] = useState(0)
   const [view, setView] = useState<ViewMode>('original')
   const [strength, setStrength] = useState(1)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportFeedback, setExportFeedback] = useState<ExportFeedback | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const stageRef = useRef<ImageStage | null>(null)
   const latestJob = useRef(0)
   const userChoseView = useRef(false)
 
@@ -62,7 +80,7 @@ export default function App({ createDepthClient }: AppProps) {
     if (!validation.ok) {
       setNotice({
         code: validation.code,
-        message: IMAGE_ERROR_MESSAGES[validation.code],
+        message: t.errors[validation.code],
       })
       return
     }
@@ -79,18 +97,47 @@ export default function App({ createDepthClient }: AppProps) {
       setResetSignal(0)
       setView('original')
       setStrength(1)
+      setExportFeedback(null)
       userChoseView.current = false
     } catch (error) {
       if (latestJob.current !== job) return
       const code: ImageErrorCode =
         error instanceof ImageError ? error.code : 'decode_failed'
-      setNotice({ code, message: IMAGE_ERROR_MESSAGES[code] })
+      setNotice({ code, message: t.errors[code] })
     } finally {
       if (latestJob.current === job) {
         setIsDecoding(false)
       }
     }
-  }, [])
+  }, [t])
+
+  const handleSample = useCallback(
+    async (sample: SampleImage) => {
+      if (isDecoding || isFetchingSample) return
+      setIsFetchingSample(true)
+      setNotice(null)
+
+      try {
+        const response = await fetch(sample.src)
+        if (!response.ok) {
+          throw new Error(`Sample request failed: ${response.status}`)
+        }
+        const blob = await response.blob()
+        const file = new File([blob], sample.fileName, {
+          type: blob.type || 'image/jpeg',
+        })
+        await handleFiles([file])
+      } catch {
+        setNotice({
+          code: 'decode_failed',
+          message: t.errors.sampleFailed,
+        })
+      } finally {
+        setIsFetchingSample(false)
+      }
+    },
+    [handleFiles, isDecoding, isFetchingSample, t],
+  )
 
   const handleFileInput = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -142,13 +189,81 @@ export default function App({ createDepthClient }: AppProps) {
     setStrength(next)
   }, [])
 
+  const handleStageReady = useCallback((stage: ImageStage | null) => {
+    stageRef.current = stage
+  }, [])
+
+  const handleExportPng = useCallback(async () => {
+    if (isExporting || imageState.status !== 'ready') return
+    setIsExporting(true)
+    setExportFeedback(null)
+
+    try {
+      const base = exportBaseName(imageState.image.fileName)
+      let blob: Blob
+
+      if (activeView === 'depth') {
+        const depthCanvas =
+          document.querySelector<HTMLCanvasElement>('canvas.dl-depth-canvas')
+        if (!depthCanvas) throw new Error(t.app.depthNotReady)
+        blob = await canvasToPng(depthCanvas)
+      } else {
+        const stage = stageRef.current
+        if (!stage) throw new Error(t.app.stageNotReady)
+        blob = await stage.capturePng()
+      }
+
+      downloadBlob(blob, `${base}-${activeView}.png`)
+      setExportFeedback({ kind: 'info', text: t.app.exportPngDone })
+    } catch (error) {
+      setExportFeedback({
+        kind: 'error',
+        text: `${t.app.exportFailed}${errorText(error)}`,
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }, [activeView, imageState, isExporting, t])
+
+  const handleExportVideo = useCallback(async () => {
+    if (isExporting || !isDepthReady) return
+    setIsExporting(true)
+    setExportFeedback(null)
+
+    try {
+      if (activeView !== '3d') {
+        handleViewChange('3d')
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        })
+      }
+
+      const stage = stageRef.current
+      if (!stage) throw new Error(t.app.stageNotReady)
+      const blob = await stage.recordLoop(3000)
+      const base =
+        imageState.status === 'ready'
+          ? exportBaseName(imageState.image.fileName)
+          : 'depth-loom'
+      downloadBlob(blob, `${base}-loop.webm`)
+      setExportFeedback({ kind: 'info', text: t.app.exportVideoDone })
+    } catch (error) {
+      setExportFeedback({
+        kind: 'error',
+        text: `${t.app.exportFailed}${errorText(error)}`,
+      })
+    } finally {
+      setIsExporting(false)
+    }
+  }, [activeView, handleViewChange, imageState, isDepthReady, isExporting, t])
+
   return (
     <div className="dl-app">
       <AppHeader />
 
       {!isReady && (
         <p className="dl-visually-hidden" role="status" aria-live="polite">
-          {isDecoding ? '正在解码图片…' : ''}
+          {isDecoding ? t.app.decodingStatus : ''}
         </p>
       )}
 
@@ -157,11 +272,14 @@ export default function App({ createDepthClient }: AppProps) {
 
         {isReady ? (
           <div className="dl-stage-wrap" aria-busy={isDecoding}>
-            <StageErrorBoundary>
+            <StageErrorBoundary
+              message={t.stage.boundaryMessage}
+              reloadLabel={t.stage.reload}
+            >
               <Suspense
                 fallback={
                   <div className="dl-stage-fallback" role="status">
-                    正在准备舞台…
+                    {t.app.stageFallback}
                   </div>
                 }
               >
@@ -171,6 +289,7 @@ export default function App({ createDepthClient }: AppProps) {
                   view={activeView === '3d' ? '3d' : 'original'}
                   strength={strength}
                   resetSignal={resetSignal}
+                  onStageReady={handleStageReady}
                 />
               </Suspense>
             </StageErrorBoundary>
@@ -199,7 +318,7 @@ export default function App({ createDepthClient }: AppProps) {
 
             {isDecoding && (
               <div className="dl-busy-pill" role="status">
-                正在解码新图片…
+                {t.app.decodingNew}
               </div>
             )}
 
@@ -210,7 +329,24 @@ export default function App({ createDepthClient }: AppProps) {
                   type="button"
                   className="dl-toast__dismiss"
                   onClick={() => setNotice(null)}
-                  aria-label="关闭提示"
+                  aria-label={t.app.closeNotice}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {exportFeedback && (
+              <div
+                className={`dl-toast${exportFeedback.kind === 'info' ? ' dl-toast--info' : ''}`}
+                role={exportFeedback.kind === 'error' ? 'alert' : 'status'}
+              >
+                <span>{exportFeedback.text}</span>
+                <button
+                  type="button"
+                  className="dl-toast__dismiss"
+                  onClick={() => setExportFeedback(null)}
+                  aria-label={t.app.closeExportNotice}
                 >
                   ×
                 </button>
@@ -220,9 +356,10 @@ export default function App({ createDepthClient }: AppProps) {
         ) : (
           <UploadZone
             onBrowse={openFilePicker}
+            onSample={(sample) => void handleSample(sample)}
             error={notice}
             onDismissError={() => setNotice(null)}
-            isBusy={isDecoding}
+            isBusy={isDecoding || isFetchingSample}
           />
         )}
       </main>
@@ -238,6 +375,9 @@ export default function App({ createDepthClient }: AppProps) {
           isDepthReady={isDepthReady}
           strength={strength}
           onStrengthChange={handleStrengthChange}
+          isExporting={isExporting}
+          onExportPng={() => void handleExportPng()}
+          onExportVideo={() => void handleExportVideo()}
           onReset={() => setResetSignal((value) => value + 1)}
           onBrowse={openFilePicker}
         />
@@ -246,9 +386,11 @@ export default function App({ createDepthClient }: AppProps) {
       {isDragging && (
         <div className="dl-drop-overlay" role="status">
           <div className="dl-drop-overlay__inner">
-            <span className="dl-drop-overlay__label">松开，载入这张照片</span>
+            <span className="dl-drop-overlay__label">
+              {t.app.dropOverlayTitle}
+            </span>
             <span className="dl-drop-overlay__hint">
-              JPG / PNG / WebP · ≤ 20 MB
+              {t.app.dropOverlayHint}
             </span>
           </div>
         </div>
@@ -259,10 +401,11 @@ export default function App({ createDepthClient }: AppProps) {
         className="dl-visually-hidden"
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        aria-label="选择图片"
+        aria-label={t.app.selectImage}
         onChange={handleFileInput}
         tabIndex={-1}
       />
     </div>
   )
 }
+

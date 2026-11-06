@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { createDepthWorker } from './lib/depth/workerClient'
+import { I18nProvider } from './lib/i18n/I18nContext'
 import './styles/tokens.css'
 import './styles/global.css'
 
@@ -12,6 +13,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App createDepthClient={createDepthWorker} />
+    <I18nProvider>
+      <App createDepthClient={createDepthWorker} />
+    </I18nProvider>
   </StrictMode>,
 )

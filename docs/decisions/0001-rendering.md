@@ -68,8 +68,9 @@ without changing the public API.
 
 - Displacement formula and depth sampling live in
   `src/lib/three/displacement.ts` and are covered by unit tests.
-- Geometry is created with 256×256 segments and a 5% bleed; UVs are expanded so
-  `ClampToEdgeWrapping` samples edge pixels outside the photo.
+- Geometry is created with 256×256 segments and a 5% bleed. UVs stay in [0, 1]:
+  the photo scales with the larger plane, so the extra 5% is photo rather than
+  a stretched edge-pixel border. `ClampToEdgeWrapping` handles edge filtering.
 - The vertex normals are not recomputed; the fragment shader is the shading
   source of truth.
 - Rotation is clamped to ±25° yaw / ±15° pitch. Disocclusion beyond that range

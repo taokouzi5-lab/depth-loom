@@ -1,8 +1,9 @@
-import type {
+﻿import type {
   DepthMode,
   DepthProgress,
   DepthStatus as DepthStatusValue,
 } from '../../lib/depth/protocol'
+import { useI18n } from '../../lib/i18n/useI18n'
 import './depth-status.css'
 
 type DepthStatusProps = {
@@ -20,17 +21,19 @@ export function DepthStatus({
   error,
   onRetry,
 }: DepthStatusProps) {
+  const { t } = useI18n()
+
   if (status === 'idle') return null
 
   if (status === 'error') {
     return (
       <div className="dl-depth-status dl-depth-status--error" role="alert">
         <div className="dl-depth-status__copy">
-          <span className="dl-depth-status__title">深度估计失败</span>
+          <span className="dl-depth-status__title">{t.depth.errorTitle}</span>
           {error && <span className="dl-depth-status__detail">{error}</span>}
         </div>
         <button type="button" className="dl-depth-status__retry" onClick={onRetry}>
-          重试
+          {t.depth.retry}
         </button>
       </div>
     )
@@ -40,10 +43,10 @@ export function DepthStatus({
     return (
       <div className="dl-depth-status dl-depth-status--ready" role="status">
         <span className="dl-depth-status__dot" aria-hidden="true" />
-        <span>深度已就绪</span>
+        <span>{t.depth.ready}</span>
         {mode && (
           <span className="dl-depth-status__badge">
-            {mode === 'wasm' ? 'CPU 模式 · 较慢' : 'WebGPU'}
+            {mode === 'wasm' ? t.depth.cpuBadge : t.depth.webgpuBadge}
           </span>
         )}
       </div>
@@ -51,7 +54,8 @@ export function DepthStatus({
   }
 
   const percent = progress ? Math.round(progress.progress) : null
-  const title = status === 'loading' ? '正在加载深度模型' : '正在估计深度'
+  const title =
+    status === 'loading' ? t.depth.loadingTitle : t.depth.estimatingTitle
 
   return (
     <div
@@ -62,11 +66,11 @@ export function DepthStatus({
       <div className="dl-depth-status__copy">
         <span className="dl-depth-status__title">{title}</span>
         <span className="dl-depth-status__detail">
-          {status === 'loading' && percent !== null ? `${percent}%` : '请稍候…'}
+          {status === 'loading' && percent !== null ? `${percent}%` : t.depth.waiting}
         </span>
       </div>
       {mode === 'wasm' && (
-        <span className="dl-depth-status__badge">CPU 模式 · 较慢</span>
+        <span className="dl-depth-status__badge">{t.depth.cpuBadge}</span>
       )}
       {percent !== null && (
         <div className="dl-depth-status__track" aria-hidden="true">
@@ -79,3 +83,4 @@ export function DepthStatus({
     </div>
   )
 }
+

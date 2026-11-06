@@ -101,10 +101,11 @@ the provenance/checksum file `MODEL_INFO.md`.
 
 ## Images
 
-The only committed image is the synthetic E2E fixture
-`e2e/fixtures/landscape.png`, generated from `e2e/fixtures/landscape.svg` by the
-project author and dedicated to CC0 1.0. It contains no third-party photography,
-people, or trademarks.
-
-User-facing sample images added in M4 must be CC0 or public domain, with author,
-source, and license recorded in `public/samples/CREDITS.md`.
+- **E2E fixture**: `e2e/fixtures/landscape.png` is synthetic, generated from
+  `e2e/fixtures/landscape.svg` by the project author, and dedicated to CC0 1.0.
+  It contains no third-party photography, people, or trademarks.
+- **User-facing samples**: `public/samples/landscape.jpg`, `street.jpg`, and
+  `portrait.jpg` are **CC0 1.0** photographs. Authors, titles, and source pages
+  are recorded in `public/samples/CREDITS.md`. The thumbnails under
+  `public/samples/thumbs/` are CC0 derivatives. No endorsement by the creators is
+  implied.

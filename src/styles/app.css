@@ -87,6 +87,26 @@
   box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
+.dl-lang {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-soft),
+    border-color var(--duration-fast) var(--ease-soft);
+}
+
+.dl-lang:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
 .dl-header__license {
   color: var(--text-dim);
   font-family: var(--font-mono);
@@ -232,6 +252,17 @@
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.dl-toast--info {
+  top: 64px;
+  border-color: var(--line-strong);
+  background: var(--surface-strong);
+  color: var(--text);
+}
+
+.dl-toast--info .dl-toast__dismiss {
+  color: var(--text-muted);
 }
 
 /* ---------- Full-window drop overlay ---------- */

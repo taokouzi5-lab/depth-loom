@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { CreateDepthClient } from './lib/depth/protocol'
+import { I18nProvider } from './lib/i18n/I18nContext'
 import { ImageError } from './lib/image/errors'
 
 const mocks = vi.hoisted(() => ({
@@ -53,7 +54,11 @@ const createDepthClient: CreateDepthClient = vi.fn(() => ({
 }))
 
 function renderApp() {
-  return render(<App createDepthClient={createDepthClient} />)
+  return render(
+    <I18nProvider>
+      <App createDepthClient={createDepthClient} />
+    </I18nProvider>,
+  )
 }
 
 function makeFile(name = 'demo.jpg', type = 'image/jpeg'): File {
@@ -105,6 +110,17 @@ describe('App', () => {
     expect(screen.queryByTestId('depth-stage')).not.toBeInTheDocument()
   })
 
+  it('switches the interface to English and back', () => {
+    renderApp()
+
+    fireEvent.click(screen.getByRole('button', { name: '切换到英文' }))
+    expect(screen.getByRole('heading', { name: /Give a photo/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Switch to Chinese' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to Chinese' }))
+    expect(screen.getByRole('heading', { name: /让一张照片/ })).toBeInTheDocument()
+  })
+
   it('decodes a dropped image and lazy-mounts the stage', async () => {
     renderApp()
 
@@ -138,6 +154,23 @@ describe('App', () => {
 
     expect(await screen.findByTestId('depth-stage')).toBeInTheDocument()
     expect(mocks.decodeImage).toHaveBeenCalledOnce()
+  })
+
+  it('loads a built-in sample through fetch', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob([new Uint8Array(8)], { type: 'image/jpeg' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderApp()
+
+    fireEvent.click(screen.getByRole('button', { name: /加载示例：山景/ }))
+
+    expect(await screen.findByTestId('depth-stage')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/samples/landscape.jpg'))
+    const decodedFile = mocks.decodeImage.mock.calls[0][0] as File
+    expect(decodedFile.name).toBe('landscape.jpg')
+    expect(decodedFile.type).toBe('image/jpeg')
   })
 
   it('rejects an unsupported file without calling the decoder', async () => {

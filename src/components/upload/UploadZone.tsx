@@ -1,4 +1,6 @@
-import type { ImageErrorCode } from '../../lib/image/errors'
+﻿import type { ImageErrorCode } from '../../lib/image/errors'
+import { useI18n } from '../../lib/i18n/useI18n'
+import { SAMPLE_IMAGES, type SampleImage } from '../../lib/samples'
 import './upload-zone.css'
 
 export type UploadNotice = {
@@ -8,6 +10,7 @@ export type UploadNotice = {
 
 type UploadZoneProps = {
   onBrowse: () => void
+  onSample: (sample: SampleImage) => void
   error?: UploadNotice | null
   onDismissError?: () => void
   isBusy?: boolean
@@ -15,26 +18,27 @@ type UploadZoneProps = {
 
 export function UploadZone({
   onBrowse,
+  onSample,
   error = null,
   onDismissError,
   isBusy = false,
 }: UploadZoneProps) {
+  const { t } = useI18n()
+
   return (
     <section className="dl-empty" aria-labelledby="dl-empty-title">
       <div className="dl-empty__copy">
-        <p className="dl-eyebrow">Local depth engine</p>
+        <p className="dl-eyebrow">{t.empty.eyebrow}</p>
         <h1 id="dl-empty-title" className="dl-empty__title">
-          让一张照片，
+          {t.empty.titleLine1}
           <br />
-          拥有纵深。
+          {t.empty.titleLine2}
         </h1>
-        <p className="dl-empty__lede">
-          把平面照片变成可以拖拽的 3D 视差。深度在浏览器里估计，全程不上传。
-        </p>
-        <div className="dl-empty__meta" aria-label="产品特性">
-          <span>无需登录</span>
-          <span>无需上传</span>
-          <span>免费开源</span>
+        <p className="dl-empty__lede">{t.empty.lede}</p>
+        <div className="dl-empty__meta">
+          <span>{t.empty.features.noAccount}</span>
+          <span>{t.empty.features.noUpload}</span>
+          <span>{t.empty.features.openSource}</span>
         </div>
       </div>
 
@@ -63,10 +67,10 @@ export function UploadZone({
             </svg>
           </span>
           <span className="dl-drop__title">
-            {isBusy ? '正在解码图片…' : '拖入图片，或点击选择'}
+            {isBusy ? t.empty.decoding : t.empty.dropTitle}
           </span>
-          <span className="dl-drop__hint">JPG · PNG · WebP · ≤ 20 MB</span>
-          <span className="dl-drop__paste">或按 Ctrl / Cmd + V 粘贴</span>
+          <span className="dl-drop__hint">{t.empty.dropFormat}</span>
+          <span className="dl-drop__paste">{t.empty.pasteHint}</span>
 
           <span className="dl-drop__corner dl-drop__corner--tl" aria-hidden="true" />
           <span className="dl-drop__corner dl-drop__corner--tr" aria-hidden="true" />
@@ -74,14 +78,41 @@ export function UploadZone({
           <span className="dl-drop__corner dl-drop__corner--br" aria-hidden="true" />
         </button>
 
-        <p className="dl-empty__privacy">图片只在浏览器本地处理，不会上传到任何服务器。</p>
+        <div className="dl-samples">
+          <span className="dl-samples__label">{t.empty.samplesLabel}</span>
+          <div className="dl-samples__list">
+            {SAMPLE_IMAGES.map((sample) => {
+              const name = t.empty.sampleNames[sample.id]
+              return (
+                <button
+                  key={sample.id}
+                  type="button"
+                  className="dl-sample"
+                  onClick={() => onSample(sample)}
+                  disabled={isBusy}
+                  aria-label={t.empty.sampleAria(name)}
+                >
+                  <img
+                    className="dl-sample__thumb"
+                    src={sample.thumbnail}
+                    alt=""
+                    loading="lazy"
+                  />
+                  <span className="dl-sample__label">{name}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <p className="dl-empty__privacy">{t.empty.privacy}</p>
 
         {error && (
           <div className="dl-error" role="alert">
             <span>{error.message}</span>
             {onDismissError && (
               <button type="button" className="dl-error__dismiss" onClick={onDismissError}>
-                知道了
+                {t.empty.dismissError}
               </button>
             )}
           </div>
@@ -90,3 +121,4 @@ export function UploadZone({
     </section>
   )
 }
+

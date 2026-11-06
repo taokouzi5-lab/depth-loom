@@ -16,6 +16,9 @@ function renderBar(overrides: Partial<ControlBarProps> = {}) {
     isDepthReady: false,
     strength: 1,
     onStrengthChange: vi.fn(),
+    isExporting: false,
+    onExportPng: vi.fn(),
+    onExportVideo: vi.fn(),
     onReset: vi.fn(),
     onBrowse: vi.fn(),
     ...overrides,
@@ -79,6 +82,31 @@ describe('ControlBar', () => {
 
     expect(props.onReset).toHaveBeenCalledOnce()
     expect(props.onBrowse).toHaveBeenCalledOnce()
+  })
+
+  it('opens the export menu and dispatches PNG/video exports', () => {
+    const props = renderBar({ isDepthReady: true, view: '3d' })
+
+    fireEvent.click(screen.getByRole('button', { name: '导出' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'PNG 截图' }))
+    expect(props.onExportPng).toHaveBeenCalledOnce()
+
+    fireEvent.click(screen.getByRole('button', { name: '导出' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '3 秒 WebM' }))
+    expect(props.onExportVideo).toHaveBeenCalledOnce()
+  })
+
+  it('disables the video export until depth is ready', () => {
+    renderBar()
+    fireEvent.click(screen.getByRole('button', { name: '导出' }))
+
+    expect(screen.getByRole('menuitem', { name: '3 秒 WebM' })).toBeDisabled()
+  })
+
+  it('disables the export trigger while exporting', () => {
+    renderBar({ isExporting: true })
+
+    expect(screen.getByRole('button', { name: /导出中/ })).toBeDisabled()
   })
 
   it('disables actions while an image is decoding', () => {

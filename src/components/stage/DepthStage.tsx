@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import type { DepthMap } from '../../lib/depth/protocol'
+import { useI18n } from '../../lib/i18n/useI18n'
 import type { ProcessedImage } from '../../lib/image/decode'
 import type { StageView } from '../../lib/three/depthLayer'
-import { createImageStage, type ImageStage } from '../../lib/three/stage'
+import { createImageStage } from '../../lib/three/stage'
+import type { ImageStage } from '../../lib/three/stageTypes'
 import './depth-stage.css'
 
 type DepthStageProps = {
@@ -11,6 +13,7 @@ type DepthStageProps = {
   view: StageView
   strength: number
   resetSignal?: number
+  onStageReady?: (stage: ImageStage | null) => void
 }
 
 export default function DepthStage({
@@ -19,7 +22,9 @@ export default function DepthStage({
   view,
   strength,
   resetSignal = 0,
+  onStageReady,
 }: DepthStageProps) {
+  const { t } = useI18n()
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<ImageStage | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,20 +46,33 @@ export default function DepthStage({
     }
 
     try {
-      stageRef.current = createImageStage({ container, image })
+      const stage = createImageStage({
+        container,
+        image,
+        ariaLabel: t.stage.canvasAria,
+      })
+      stageRef.current = stage
+      onStageReady?.(stage)
     } catch {
       // oxlint-disable-next-line react/set-state-in-effect -- the failure only exists after WebGL init runs.
-      setError('当前浏览器无法初始化 3D 舞台，请确认已启用 WebGL。')
+      setError(t.stage.webglError)
     }
-  }, [image])
+  }, [image, onStageReady, t.stage.canvasAria, t.stage.webglError])
 
   useEffect(
     () => () => {
       stageRef.current?.dispose()
       stageRef.current = null
+      onStageReady?.(null)
     },
-    [],
+    [onStageReady],
   )
+
+  useEffect(() => {
+    containerRef.current
+      ?.querySelector('canvas')
+      ?.setAttribute('aria-label', t.stage.canvasAria)
+  }, [t.stage.canvasAria])
 
   useEffect(() => {
     stageRef.current?.setDepth(depth)
@@ -83,3 +101,4 @@ export default function DepthStage({
     </div>
   )
 }
+

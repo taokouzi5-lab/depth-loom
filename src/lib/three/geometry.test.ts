@@ -24,7 +24,7 @@ describe('createImagePlaneGeometry', () => {
     geometry.dispose()
   })
 
-  it('expands UVs so ClampToEdge supplies the bleed pixels', () => {
+  it('keeps UVs in [0, 1] so the 5% bleed scales the photo instead of smearing its edge', () => {
     const geometry = createImagePlaneGeometry(1.6)
     const uv = geometry.getAttribute('uv')
     let min = Number.POSITIVE_INFINITY
@@ -35,8 +35,8 @@ describe('createImagePlaneGeometry', () => {
       min = Math.min(min, u, v)
       max = Math.max(max, u, v)
     }
-    expect(min).toBeCloseTo(-PLANE_BLEED / 2, 6)
-    expect(max).toBeCloseTo(1 + PLANE_BLEED / 2, 6)
+    expect(min).toBeCloseTo(0, 6)
+    expect(max).toBeCloseTo(1, 6)
     geometry.dispose()
   })
 

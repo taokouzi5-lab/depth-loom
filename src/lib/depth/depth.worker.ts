@@ -149,7 +149,7 @@ async function loadEstimator(
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '鏈煡閿欒'
+  return error instanceof Error ? error.message : '未知错误'
 }
 
 async function handleEstimate(request: DepthEstimateRequest): Promise<void> {

@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+﻿import { useEffect, useRef } from 'react'
 import type { DepthMap } from '../../lib/depth/protocol'
 import { depthToRgba } from '../../lib/depth/normalize'
+import { useI18n } from '../../lib/i18n/useI18n'
 import type { ProcessedImage } from '../../lib/image/decode'
 import './depth-view.css'
 
@@ -10,6 +11,7 @@ type DepthViewProps = {
 }
 
 export function DepthView({ image, depth }: DepthViewProps) {
+  const { t } = useI18n()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -42,15 +44,16 @@ export function DepthView({ image, depth }: DepthViewProps) {
   return (
     <div className="dl-depth-view">
       <div className="dl-depth-view__label" aria-hidden="true">
-        <span>DEPTH MAP</span>
-        <span>越亮越近</span>
+        <span>{t.depth.mapLabel}</span>
+        <span>{t.depth.mapHint}</span>
       </div>
       <canvas
         ref={canvasRef}
         className="dl-depth-canvas"
         role="img"
-        aria-label="深度图，越亮表示越近"
+        aria-label={t.depth.canvasAria}
       />
     </div>
   )
 }
+

@@ -13,7 +13,10 @@ describe('StageErrorBoundary', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
     render(
-      <StageErrorBoundary>
+      <StageErrorBoundary
+        message="3D 舞台加载失败，可能是网络或浏览器缓存问题。"
+        reloadLabel="重新加载"
+      >
         <ThrowingStage />
       </StageErrorBoundary>,
     )

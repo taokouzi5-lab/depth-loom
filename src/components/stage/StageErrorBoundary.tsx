@@ -2,6 +2,8 @@ import { Component, type ReactNode } from 'react'
 
 type StageErrorBoundaryProps = {
   children: ReactNode
+  message: string
+  reloadLabel: string
 }
 
 type StageErrorBoundaryState = {
@@ -28,13 +30,13 @@ export class StageErrorBoundary extends Component<
       return (
         <div className="dl-stage-error" role="alert">
           <div className="dl-stage-error__inner">
-            <p>3D 舞台加载失败，可能是网络或浏览器缓存问题。</p>
+            <p>{this.props.message}</p>
             <button
               type="button"
               className="dl-stage-error__action"
               onClick={() => window.location.reload()}
             >
-              重新加载
+              {this.props.reloadLabel}
             </button>
           </div>
         </div>

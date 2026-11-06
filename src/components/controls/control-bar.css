@@ -112,6 +112,49 @@
   margin-left: auto;
 }
 
+.dl-export {
+  position: static;
+}
+
+.dl-export__menu {
+  position: absolute;
+  z-index: 9;
+  right: 16px;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 152px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(18px);
+}
+
+.dl-export__item {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dl-export__item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dl-export__item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .dl-button {
   padding: 8px 13px;
   border: 1px solid var(--line);
@@ -262,13 +305,20 @@
   .dl-controlbar__actions {
     display: grid;
     width: 100%;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     margin-left: 0;
   }
 
-  .dl-button {
+  .dl-button,
+  .dl-export .dl-button {
+    width: 100%;
     padding: 11px 13px;
+  }
+
+  .dl-export__menu {
+    right: 18px;
+    left: auto;
   }
 
   .dl-strength {
