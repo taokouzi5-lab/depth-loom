@@ -1,14 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
+import type { DepthMap } from '../../lib/depth/protocol'
 import type { ProcessedImage } from '../../lib/image/decode'
+import type { StageView } from '../../lib/three/depthLayer'
 import { createImageStage, type ImageStage } from '../../lib/three/stage'
 import './depth-stage.css'
 
 type DepthStageProps = {
   image: ProcessedImage
+  depth: DepthMap | null
+  view: StageView
+  strength: number
   resetSignal?: number
 }
 
-export default function DepthStage({ image, resetSignal = 0 }: DepthStageProps) {
+export default function DepthStage({
+  image,
+  depth,
+  view,
+  strength,
+  resetSignal = 0,
+}: DepthStageProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<ImageStage | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -44,6 +55,18 @@ export default function DepthStage({ image, resetSignal = 0 }: DepthStageProps) 
     },
     [],
   )
+
+  useEffect(() => {
+    stageRef.current?.setDepth(depth)
+  }, [depth])
+
+  useEffect(() => {
+    stageRef.current?.setView(view)
+  }, [view])
+
+  useEffect(() => {
+    stageRef.current?.setStrength(strength)
+  }, [strength])
 
   useEffect(() => {
     stageRef.current?.reset()

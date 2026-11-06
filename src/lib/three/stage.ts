@@ -12,8 +12,10 @@ import {
   WebGLRenderer,
 } from 'three'
 import type { PlaneGeometry } from 'three'
+import type { DepthMap } from '../depth/protocol'
 import type { ProcessedImage } from '../image/decode'
 import { computeCameraDistance } from './cameraFit'
+import { DepthLayer, type StageView } from './depthLayer'
 import { createImagePlaneGeometry } from './geometry'
 import {
   applyLimitWithRubberBand,
@@ -33,11 +35,14 @@ export interface ImageStageOptions {
 export interface ImageStage {
   dispose(): void
   reset(): void
+  setDepth(depth: DepthMap | null): void
   setImage(image: ProcessedImage): void
+  setStrength(strength: number): void
+  setView(view: StageView): void
 }
 
 const FOV_DEG = 45
-const DESKTOP_FILL = 0.76
+const DESKTOP_FILL = 0.8
 const MOBILE_FILL = 0.72
 const MOBILE_WIDTH = 640
 const YAW_SWEEP = Math.PI * 0.5
@@ -65,6 +70,7 @@ class ImageStageController implements ImageStage {
   private geometry: PlaneGeometry
   private texture: CanvasTexture
   private material: MeshBasicMaterial
+  private depthLayer: DepthLayer
 
   private baseDistance = 1
   private zoom = 1
@@ -119,6 +125,13 @@ class ImageStageController implements ImageStage {
     this.material = new MeshBasicMaterial({ map: this.texture, toneMapped: false })
     this.mesh = new Mesh(this.geometry, this.material)
     this.group.add(this.mesh)
+    this.depthLayer = new DepthLayer(
+      this.mesh,
+      this.geometry,
+      this.material,
+      this.texture,
+      () => this.requestRender(),
+    )
 
     this.resizeObserver = new ResizeObserver(() => {
       this.fitCamera()
@@ -138,6 +151,18 @@ class ImageStageController implements ImageStage {
     this.requestRender()
   }
 
+  setDepth(depth: DepthMap | null): void {
+    this.depthLayer.setDepth(depth)
+  }
+
+  setView(view: StageView): void {
+    this.depthLayer.setView(view)
+  }
+
+  setStrength(strength: number): void {
+    this.depthLayer.setStrength(strength)
+  }
+
   setImage(next: ProcessedImage): void {
     if (next === this.currentImage) return
     this.currentImage = next
@@ -149,6 +174,7 @@ class ImageStageController implements ImageStage {
       toneMapped: false,
     })
 
+    this.depthLayer.dispose()
     this.geometry.dispose()
     this.texture.dispose()
     this.material.dispose()
@@ -158,6 +184,13 @@ class ImageStageController implements ImageStage {
     this.material = nextMaterial
     this.mesh.geometry = nextGeometry
     this.mesh.material = nextMaterial
+    this.depthLayer = new DepthLayer(
+      this.mesh,
+      nextGeometry,
+      nextMaterial,
+      nextTexture,
+      () => this.requestRender(),
+    )
 
     this.yaw = 0
     this.pitch = 0
@@ -177,6 +210,7 @@ class ImageStageController implements ImageStage {
     this.resizeObserver.disconnect()
     this.detachInput()
     this.pointers.clear()
+    this.depthLayer.dispose()
     this.geometry.dispose()
     this.texture.dispose()
     this.material.dispose()

@@ -24,12 +24,17 @@ File
        ImageData → RawImage → Depth Anything V2 Small
        → predicted_depth (interpolated to the input size)
        → per-image min/max normalize → Float32Array
-  → depth view / [M3] CPU vertex displacement → Three.js scene
+  → view mode:
+       original → flat MeshBasicMaterial plane
+       depth    → grayscale depth canvas overlay
+       3D       → CPU vertex displacement + custom fragment shader
   → render / export
 ```
 
 M1 renders the flat image on a plane. M2 adds the worker depth pass and the
-depth-map view; the Three.js mesh is still flat until M3.
+depth-map view. M3 adds the displaced 3D mesh, depth-derived shading/fog, the
+strength slider, and the three view modes. The first depth result auto-switches
+to 3D unless the user has already chosen a view.
 
 The worker keeps a single pipeline instance. The first image pays the
 model/ORT load; subsequent images reuse the in-memory weights. The transfer to
@@ -49,6 +54,7 @@ generated artifacts and are not committed.
 | Image pipeline | `src/lib/image` | Validation, EXIF-aware decode, resize |
 | Depth pipeline | `src/lib/depth` | Worker protocol, ONNX/model config, normalization |
 | Three stage | `src/lib/three` | Camera fit, orbit math, renderer lifecycle |
+| Depth layer | `src/lib/three/depthLayer.ts`, `depthMaterial.ts` | Depth texture, displacement material, mode switching |
 | Hooks | `src/hooks` | Upload listeners, depth worker state machine |
 | UI components | `src/components` | Upload, stage, depth view/status, controls |
 | Design system | `src/styles` | Tokens, reset, motion, responsive rules |
@@ -67,6 +73,11 @@ chunk (M2) is loaded only when an image is ready.
 - Inference: target < 5 s WebGPU, < 15 s WASM on a mid-range laptop
 - Render on demand: no `requestAnimationFrame` loop while idle
 
+Measured M3 build: initial JS 75.1 KB gzip, lazy stage 134.1 KB gzip, depth
+worker 1.29 MB uncompressed; the real-model E2E completes in ~9 s on the WASM
+path. WebGPU performance is not measured yet because this machine's headless
+Chromium has no `navigator.gpu`.
+
 ## State model
 
 `App` keeps the last successful image mounted while a replacement decodes, so a
@@ -80,27 +91,36 @@ type ImageState =
 // alongside:
 const [isDecoding, setIsDecoding] = useState(false)
 const [notice, setNotice] = useState<UploadNotice | null>(null)
+const [view, setView] = useState<'original' | 'depth' | '3d'>('original')
+const [strength, setStrength] = useState(1)
 ```
 
 A monotonically increasing job id makes the newest decode win; stale results
 are ignored. The stage owns camera/rotation state internally, and React only
-passes the decoded image. This keeps pointer-move updates out of React's render
-path. On replacement the stage disposes the old geometry, texture, and material
-but keeps its `WebGLRenderer`, avoiding WebGL context churn.
+passes the decoded image, depth result, view, and strength. This keeps
+pointer-move updates out of React's render path. On replacement the stage
+disposes the old geometry, texture, and material but keeps its
+`WebGLRenderer`, avoiding WebGL context churn.
+
+When the first depth result arrives and the user has not chosen a view, the App
+switches to 3D. Choosing a view sets a ref that suppresses this auto-switch for
+the current image; the ref resets on the next image. The strength is reset to 1
+per image.
 
 ## Testing strategy
 
 - **Unit (Vitest):** validation, resize math, decode options, camera fit,
-  orbit clamping, plane geometry, depth normalization/RGBA conversion.
+  orbit clamping, plane geometry, depth normalization/RGBA conversion, bilinear
+  depth sampling, and plane displacement.
 - **Component (Testing Library):** upload entry points, error presentation,
-  app state transitions, view switch, depth status, and the depth hook state
-  machine with an injected fake client.
-- **E2E (Playwright):** real upload → stage canvas → depth estimate → depth-map
-  view, plus a real-model run on desktop. The 375px upload path is covered;
-  mobile depth is deferred to a later E2E pass.
+  app state transitions, view switch (original/depth/3D), strength slider,
+  depth status, and the depth hook state machine with an injected fake client.
+- **E2E (Playwright):** real upload → stage canvas → depth estimate → auto 3D →
+  strength change → depth-map view, on desktop. The 375px upload path is
+  covered; mobile depth is deferred to a later E2E pass.
 - Coverage threshold: 80% lines/statements/functions on `src/lib` and
-  `src/hooks`; the WebGL renderer glue, the depth worker, and the Worker client
-  are excluded and verified in-browser.
+  `src/hooks`; the WebGL renderer/depth-material glue, the depth worker, and the
+  Worker client are excluded and verified in-browser.
 
 ## Decisions
 

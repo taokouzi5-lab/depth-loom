@@ -69,6 +69,8 @@ export default defineConfig(({ mode }) => ({
         // WebGL / Worker integration is verified in the browser E2E suite;
         // pure logic lives in tested sibling modules.
         'src/lib/three/stage.ts',
+        'src/lib/three/depthLayer.ts',
+        'src/lib/three/depthMaterial.ts',
         'src/lib/depth/depth.worker.ts',
         'src/lib/depth/workerClient.ts',
       ],

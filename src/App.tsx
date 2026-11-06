@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useCallback,
+  useEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -44,8 +45,10 @@ export default function App({ createDepthClient }: AppProps) {
   const [notice, setNotice] = useState<UploadNotice | null>(null)
   const [resetSignal, setResetSignal] = useState(0)
   const [view, setView] = useState<ViewMode>('original')
+  const [strength, setStrength] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const latestJob = useRef(0)
+  const userChoseView = useRef(false)
 
   const openFilePicker = useCallback(() => {
     fileInputRef.current?.click()
@@ -75,6 +78,8 @@ export default function App({ createDepthClient }: AppProps) {
       setImageState({ status: 'ready', image })
       setResetSignal(0)
       setView('original')
+      setStrength(1)
+      userChoseView.current = false
     } catch (error) {
       if (latestJob.current !== job) return
       const code: ImageErrorCode =
@@ -111,10 +116,31 @@ export default function App({ createDepthClient }: AppProps) {
     isReady && !isDepthDisabled ? imageState.image : null,
     createDepthClient,
   )
+  const isDepthReady = depth.status === 'ready' && depth.depth !== null
   const activeView: ViewMode =
-    view === 'depth' && depth.status === 'ready' && depth.depth
+    isDepthReady && view === 'depth'
       ? 'depth'
-      : 'original'
+      : isDepthReady && view === '3d'
+        ? '3d'
+        : 'original'
+
+  useEffect(() => {
+    if (isDepthReady && !userChoseView.current) {
+      // Bring the photo to life once the first depth result lands. If the user
+      // already picked a view (including original), respect that choice.
+      // oxlint-disable-next-line react/set-state-in-effect
+      setView('3d')
+    }
+  }, [isDepthReady])
+
+  const handleViewChange = useCallback((next: ViewMode) => {
+    userChoseView.current = true
+    setView(next)
+  }, [])
+
+  const handleStrengthChange = useCallback((next: number) => {
+    setStrength(next)
+  }, [])
 
   return (
     <div className="dl-app">
@@ -139,7 +165,13 @@ export default function App({ createDepthClient }: AppProps) {
                   </div>
                 }
               >
-                <DepthStage image={imageState.image} resetSignal={resetSignal} />
+                <DepthStage
+                  image={imageState.image}
+                  depth={depth.depth}
+                  view={activeView === '3d' ? '3d' : 'original'}
+                  strength={strength}
+                  resetSignal={resetSignal}
+                />
               </Suspense>
             </StageErrorBoundary>
 
@@ -159,6 +191,7 @@ export default function App({ createDepthClient }: AppProps) {
               mode={depth.mode}
               error={depth.error}
               onRetry={() => {
+                userChoseView.current = false
                 setView('original')
                 depth.retry()
               }}
@@ -201,8 +234,10 @@ export default function App({ createDepthClient }: AppProps) {
           height={imageState.image.height}
           isBusy={isDecoding}
           view={activeView}
-          onViewChange={setView}
-          isDepthReady={depth.status === 'ready'}
+          onViewChange={handleViewChange}
+          isDepthReady={isDepthReady}
+          strength={strength}
+          onStrengthChange={handleStrengthChange}
           onReset={() => setResetSignal((value) => value + 1)}
           onBrowse={openFilePicker}
         />

@@ -29,6 +29,26 @@ test('estimates depth locally and renders the depth map', async ({ page }, testI
   await expect(depthButton).toBeEnabled({ timeout: 180_000 })
   await expect(page.getByText('深度已就绪')).toBeVisible()
 
+  // The first depth result auto-switches to 3D and enables the strength slider.
+  const view3d = page.getByRole('button', { name: '3D' })
+  await expect(view3d).toHaveAttribute('aria-pressed', 'true')
+  const slider = page.getByRole('slider', { name: '深度强度' })
+  await expect(slider).toBeEnabled()
+  await slider.evaluate((element) => {
+    const input = element as HTMLInputElement
+    // Bypass React's value tracker so the synthetic change is observed.
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set
+    setter?.call(input, '1.5')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await expect(slider).toHaveValue('1.5')
+  await expect(page.getByText('1.50×')).toBeVisible()
+  await expect(page.locator('canvas.dl-canvas')).toBeVisible()
+
   await depthButton.click()
   const depthCanvas = page.locator('canvas.dl-depth-canvas')
   await expect(depthCanvas).toBeVisible()

@@ -100,7 +100,7 @@
   position: relative;
   display: grid;
   min-height: 0;
-  padding: 0 var(--stage-inset) clamp(96px, 12vh, 128px);
+  padding: 0 var(--stage-inset) clamp(156px, 18vh, 186px);
   place-items: center;
 }
 
@@ -121,7 +121,7 @@
 .dl-main__frame {
   position: absolute;
   z-index: 0;
-  inset: 10px var(--stage-inset) clamp(92px, 12vh, 120px);
+  inset: 10px var(--stage-inset) clamp(148px, 17vh, 176px);
   border: 1px solid rgba(242, 239, 233, 0.045);
   border-radius: 26px;
   pointer-events: none;
@@ -130,7 +130,7 @@
 .dl-stage-wrap {
   position: absolute;
   z-index: 1;
-  inset: 0 var(--stage-inset) clamp(92px, 12vh, 120px);
+  inset: 0 var(--stage-inset) clamp(148px, 17vh, 176px);
 }
 
 .dl-stage-fallback {
@@ -302,7 +302,7 @@
   }
 
   .dl-main {
-    padding: 0 16px calc(186px + env(safe-area-inset-bottom));
+    padding: 0 16px calc(232px + env(safe-area-inset-bottom));
   }
 
   .dl-main__frame {
@@ -310,7 +310,7 @@
   }
 
   .dl-stage-wrap {
-    inset: 0 12px calc(176px + env(safe-area-inset-bottom));
+    inset: 0 12px calc(220px + env(safe-area-inset-bottom));
   }
 
   .dl-depth-scan {

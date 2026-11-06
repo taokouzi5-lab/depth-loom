@@ -14,6 +14,8 @@ function renderBar(overrides: Partial<ControlBarProps> = {}) {
     view: 'original',
     onViewChange: vi.fn(),
     isDepthReady: false,
+    strength: 1,
+    onStrengthChange: vi.fn(),
     onReset: vi.fn(),
     onBrowse: vi.fn(),
     ...overrides,
@@ -23,13 +25,15 @@ function renderBar(overrides: Partial<ControlBarProps> = {}) {
 }
 
 describe('ControlBar', () => {
-  it('shows file info and keeps the depth view disabled until ready', () => {
+  it('shows file info and keeps depth views disabled until ready', () => {
     renderBar()
 
     expect(screen.getByText('landscape.png')).toBeInTheDocument()
     expect(screen.getByText('1024 × 640 px · 本地')).toBeInTheDocument()
     expect(screen.getByText('拖拽旋转 · 滚轮 / 双指缩放')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '深度' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '3D' })).toBeDisabled()
+    expect(screen.getByRole('slider', { name: '深度强度' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '原图' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -41,6 +45,20 @@ describe('ControlBar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '深度' }))
     expect(props.onViewChange).toHaveBeenCalledWith('depth')
+  })
+
+  it('switches to 3D and enables the strength slider', () => {
+    const props = renderBar({ isDepthReady: true, view: '3d' })
+
+    expect(screen.getByRole('button', { name: '3D' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    const slider = screen.getByRole('slider', { name: '深度强度' })
+    expect(slider).toBeEnabled()
+
+    fireEvent.change(slider, { target: { value: '1.5' } })
+    expect(props.onStrengthChange).toHaveBeenCalledWith(1.5)
   })
 
   it('uses the depth hint while the depth view is active', () => {

@@ -60,5 +60,5 @@
 
   --header-height: 76px;
   --stage-inset: clamp(16px, 4vw, 56px);
-  --panel-width: min(780px, calc(100vw - 32px));
+  --panel-width: min(840px, calc(100vw - 32px));
 }

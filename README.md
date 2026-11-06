@@ -5,9 +5,8 @@
 Depth Loom estimates depth locally with Depth Anything V2 Small and renders the
 photo as a subtly displaced mesh. Nothing is uploaded; there is no backend.
 
-> Status: **M2 — local depth estimation and depth-map view.**
-> Vertex displacement, exports, CC0 samples, and the bilingual README arrive in
-> M3–M5.
+> Status: **M3 — 3D parallax, depth strength, and three view modes.**
+> Exports, CC0 samples, mobile polish, and the bilingual README arrive in M4–M5.
 
 ## What works
 
@@ -21,18 +20,20 @@ photo as a subtly displaced mesh. Nothing is uploaded; there is no backend.
   shows a "CPU 模式 · 较慢" badge.
 - Model loading has byte progress; inference has a distinct state; a failed load
   shows an explicit error with retry.
-- Switch between the original image and the grayscale depth map. Brighter means
-  nearer. The depth result stays in memory for the M3 displacement pass.
+- **3D view**: the normalized depth field drives CPU vertex displacement on the
+  257×257 plane; a custom fragment shader derives relief normals from the depth
+  texture and adds depth-based fog. The 5% edge bleed and ±25°/±15° orbit limits
+  keep disocclusion out of the MVP.
+- **Depth strength slider (0–2×)**: real-time, applied on input without a
+  per-frame geometry rebuild. The first successful depth result auto-switches to
+  3D; original and depth views remain one click away.
+- Switch between original, grayscale depth, and 3D. Brighter depth means nearer.
 - The worker keeps one pipeline instance; switching images does not reload the
   weights.
-- The Three.js stage shows the photo on a textured plane with a 5% edge bleed.
-  Drag to rotate (yaw ±25°, pitch ±15°, rubber-band return), wheel / two-finger
+- Drag to rotate (yaw ±25°, pitch ±15°, rubber-band return), wheel / two-finger
   zoom, arrow keys, and Home to reset. Rendering is on demand.
 - The image is replaced without leaking the WebGL context; old geometry,
   textures, and materials are disposed.
-
-M2 still presents the depth map on a flat view. M3 will displace the image mesh
-and add the strength slider and the 3D view.
 
 ## Local development
 
@@ -61,18 +62,20 @@ npm run test:e2e                  # serves dist via vite preview
 ```
 
 The Playwright suite runs against `dist`, so build before running it. The E2E
-suite includes a real-model depth test that takes roughly 10 seconds on this
+suite includes a real-model depth test that takes roughly 9 seconds on this
 machine with the WASM fallback.
 
-## Measured M2 bundle
+## Measured M3 bundle
 
-- Initial JS: **74.8 KB gzip**, CSS 4.5 KB.
-- Lazy Three.js stage: 132.9 KB gzip.
+- Initial JS: **75.1 KB gzip**, CSS 4.7 KB.
+- Lazy Three.js stage: **134.1 KB gzip**.
 - Depth worker chunk: 1.29 MB uncompressed, loaded only after an image is ready.
 - Self-hosted weights: **46.4 MB** total (q4f16 19.1 MB for WebGPU, q8 27.3 MB
   for WASM).
 - ONNX Runtime WASM is generated into `public/ort/` at dev/build time (26–28 MB
   per backend); it is not committed.
+- Test suite: 85 unit/component tests, plus 5 passing E2E tests (mobile depth is
+  the one skipped case).
 
 The initial route stays under the 200 KB gzip budget.
 
@@ -99,9 +102,11 @@ See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for the full license text
 - **First depth load is large** (tens of MB). The worker caches the pipeline in
   memory, so switching images is instant after initialization. A hard reload may
   refetch the files; the HTTP cache may help.
-- **No inpainting**: beyond the orbit limits, foreground disocclusion would show
-  gaps. M3 clamps the angle and adds edge bleed/depth fog rather than pretending
-  the problem is solved.
+- **No inpainting**: the 3D view is constrained to ±25° yaw / ±15° pitch. Beyond
+  that, foreground disocclusion would show gaps. The 5% edge bleed and depth fog
+  reduce edge artifacts; they do not replace inpainting.
+- **Depth strength** is a look control, not a measurement; at 2× the relief is
+  intentionally exaggerated.
 - The depth map is relative, not metric; it is not suitable for measurement,
   medical, or safety-critical use.
 
