@@ -34,7 +34,9 @@ export default defineConfig({
     video: 'off',
   },
   webServer: {
-    command: `npm run preview -- --port ${PORT} --strictPort`,
+    // Bind explicitly to IPv4: on Linux runners `localhost` can resolve to ::1
+    // while Playwright polls 127.0.0.1, which times out the webServer check.
+    command: `npm run preview -- --host 127.0.0.1 --port ${PORT} --strictPort`,
     url: `http://127.0.0.1:${PORT}${BASE_PATH}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
