@@ -47,11 +47,21 @@ export default defineConfig({
     {
       name: 'mobile-375',
       use: {
-        // Chromium touch emulation at a 375px viewport. iOS Safari gets its own
-        // pass in M5 once WebKit is installed in CI.
+        // Chromium touch emulation at a 375px viewport.
         ...devices['Pixel 7'],
         viewport: { width: 375, height: 812 },
       },
+    },
+    {
+      name: 'webkit-375',
+      use: {
+        ...devices['iPhone 13'],
+        viewport: { width: 375, height: 812 },
+      },
+      // Safari has no WebM encoder, and the real-model depth flow is covered by
+      // the Chromium projects. WebKit still checks layout, upload, i18n, samples,
+      // and PNG export.
+      testIgnore: ['**/depth.spec.ts'],
     },
   ],
 })

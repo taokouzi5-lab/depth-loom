@@ -97,7 +97,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       # pretest:e2e builds first, so the preview server always serves this commit.
       - run: npm run test:e2e
       - name: Upload Playwright report

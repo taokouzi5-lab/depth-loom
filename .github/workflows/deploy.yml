@@ -30,7 +30,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       # vite.config.ts sets base to /depth-loom/ for production builds. If the
       # repository is renamed, update that base before enabling Pages.
       # test:e2e builds dist via pretest:e2e; the uploaded artifact is that dist.

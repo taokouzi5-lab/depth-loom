@@ -129,8 +129,8 @@ These are averages from a local preview server, not a benchmark: transfer time i
 negligible because the weights are local. CI runners have no GPU, so the E2E
 suite always exercises the CPU fallback; the WebGPU row is a local measurement.
 
-- Test suite: 105 unit/component tests and 10 passing E2E tests (desktop + 375px
-  mobile, including the real-model depth/export flow).
+- Test suite: 105 unit/component tests and 14 E2E tests (desktop Chromium, 375px
+  Chromium with the real-model depth/export flow, and a 375px WebKit subset).
 - Coverage: 92.4% statements / 82.1% branches over `src/lib` and `src/hooks`.
   WebGL, worker, and download glue are excluded from the coverage denominator and
   exercised by the E2E suite instead.
@@ -163,8 +163,9 @@ The three sample images are **CC0 1.0**; authors and source pages are recorded i
 - **WebGPU is measured locally** (Edge 157, NVIDIA Ampere). CI runners have no
   GPU, so the E2E suite always exercises the CPU fallback; the WebGPU row is not
   re-measured on every release.
-- The **mobile E2E project is Chromium touch emulation at 375px**, not WebKit.
-  Safari-specific behavior (notably WebM export) is documented but not yet in CI.
+- **Safari is covered by a 375px WebKit subset** (layout, upload, i18n, samples,
+  PNG). The real-model depth flow and WebM export stay Chromium-only because
+  WebKit has no WebM encoder; Safari users see an explicit export error.
 - **First depth load is large** (tens of MB). The worker caches the pipeline in
   memory, so switching images is instant after initialization. A hard reload may
   refetch the files; the HTTP cache may help.

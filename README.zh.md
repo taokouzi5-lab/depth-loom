@@ -115,8 +115,8 @@ PNG）在 WASM 回退下每个视口约 13 秒；桌面 + 375px 移动端全套�
 Windows 11。这是本地预览服务器上的平均值，不是基准测试——权重在本地，传输时间
 可忽略。CI runner 没有 GPU，因此 E2E 始终跑 CPU 回退；WebGPU 数据来自本地实测。
 
-- 测试：105 个单元/组件测试，10 个 E2E（桌面 + 375px 移动端，含真实模型深度/导出
-  流程）。
+- 测试：105 个单元/组件测试，14 个 E2E（桌面 Chromium、375px Chromium 含真实
+  模型深度/导出流程、375px WebKit 子集）。
 - 覆盖率：`src/lib` 与 `src/hooks` 范围内语句 92.4% / 分支 82.1%。WebGL、
   Worker 和下载胶水代码不在覆盖率分母内，由 E2E 覆盖。
 
@@ -146,8 +146,9 @@ CC-BY-NC-4.0，本项目未使用）。许可证、作者、来源链接、文�
 - **WebGPU 不可用** → 使用 q8 WASM，速度较慢，界面会明确提示。
 - **WebGPU 已在本地实测**（Edge 157，NVIDIA Ampere）。CI runner 没有 GPU，
   因此 E2E 始终跑 CPU 回退；WebGPU 数据不会随每个版本重新测量。
-- **移动端 E2E 是 375px 的 Chromium 触摸模拟**，不是 WebKit。Safari 相关行为
-  （尤其是 WebM 导出）已记录，但尚未进入 CI。
+- **Safari 由 375px WebKit 子集覆盖**（布局、上传、i18n、示例、PNG）。真实模型
+  深度流程与 WebM 导出仍只跑 Chromium，因为 WebKit 没有 WebM 编码器；Safari
+  用户会看到明确的导出错误。
 - **首次加载模型较大**（几十 MB）。Worker 在内存中缓存管线，之后切换图片是即时
   的；硬刷新可能重新拉取，HTTP 缓存可能有帮助。
 - **没有 inpainting**：3D 视图限制在 ±25° yaw / ±15° pitch，再大就会在前景去遮
