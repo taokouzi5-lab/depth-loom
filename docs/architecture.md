@@ -38,7 +38,8 @@ M1 renders the flat image on a plane. M2 adds the worker depth pass and the
 depth-map view. M3 adds the displaced 3D mesh, depth-derived shading/fog, the
 strength slider, and the three view modes. The first depth result auto-switches
 to 3D unless the user has already chosen a view. M4 adds three CC0 samples,
-PNG/WebM export, Chinese/English UI, and mobile depth E2E coverage.
+PNG/WebM export, Chinese/English UI, and mobile depth E2E coverage. M5 adds
+bilingual documentation and a CI E2E job; GitHub Pages deployment is pending.
 
 The worker keeps a single pipeline instance. The first image pays the
 model/ORT load; subsequent images reuse the in-memory weights. The transfer to
@@ -57,12 +58,12 @@ generated artifacts and are not committed.
 | UI shell | `src/App.tsx`, `src/components` | Upload affordances, states, accessible chrome |
 | Image pipeline | `src/lib/image` | Validation, EXIF-aware decode, resize |
 | Depth pipeline | `src/lib/depth` | Worker protocol, ONNX/model config, normalization |
-| Three stage | `src/lib/three` | Camera fit, orbit math, renderer lifecycle, canvas capture/recording |
+| Three stage | `src/lib/three` | Camera fit, orbit/input state machines, renderer lifecycle, capture/recording |
 | Depth layer | `src/lib/three/depthLayer.ts`, `depthMaterial.ts` | Depth texture, displacement material, mode switching |
 | Export | `src/lib/export/download.ts` | PNG flattening and browser download |
 | Samples | `src/lib/samples.ts`, `public/samples` | Three CC0 images and credits |
 | i18n | `src/lib/i18n` | Typed zh/en dictionary, provider, localStorage |
-| Hooks | `src/hooks` | Upload listeners, depth worker state machine |
+| Hooks | `src/hooks` | Upload listeners, depth worker state machine, export state |
 | UI components | `src/components` | Upload, stage, depth view/status, controls |
 | Design system | `src/styles` | Tokens, reset, motion, responsive rules |
 | Docs | `docs` | Architecture and decision records |
@@ -80,11 +81,15 @@ chunk (M2) is loaded only when an image is ready.
 - Inference: target < 5 s WebGPU, < 15 s WASM on a mid-range laptop
 - Render on demand: no `requestAnimationFrame` loop while idle
 
-Measured M4 build: initial JS 78.5 KB gzip, CSS 5.1 KB, lazy stage 134.7 KB
-gzip, depth worker 1.29 MB uncompressed. The real-model E2E (load + inference +
-3-second WebM + depth PNG) completes in ~13 s on the WASM path. WebGPU
-performance is not measured yet because this machine's headless Chromium has no
-`navigator.gpu`.
+Measured build: initial JS 78.5 KB gzip, CSS 5.1 KB, lazy stage 134.7 KB gzip,
+depth worker 1.29 MB uncompressed.
+
+Measured depth pipeline (headless Chromium 156, WASM q8, CPU, local production
+preview, three runs averaged): decode 114 ms, model load + init 1.88 s, inference
+5.47 s, total to depth-ready 7.46 s on the first image; a second image with the
+worker's pipeline cached reaches ready in 6.04 s. Machine: i7-12700H, 15.8 GB
+RAM. WebGPU performance is not measured because this machine's headless Chromium
+has no `navigator.gpu`; the numbers above are the CPU fallback baseline.
 
 ## State model
 

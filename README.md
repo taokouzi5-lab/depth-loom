@@ -2,12 +2,13 @@
 
 **Turn a 2D photo into a draggable 3D parallax scene — entirely in your browser.**
 
+English | [简体中文](README.zh.md)
+
 Depth Loom estimates depth locally with Depth Anything V2 Small and renders the
 photo as a subtly displaced mesh. Nothing is uploaded; there is no backend.
 
-> Status: **M4 — samples, PNG/WebM export, and Chinese/English UI.**
-> The bilingual README, final CI/E2E hardening, and GitHub Pages deployment
-> arrive in M5.
+> Status: **M5 — bilingual documentation and a hardened CI pipeline.**
+> GitHub Pages deployment and the online demo link are pending.
 
 ## What works
 
@@ -69,22 +70,57 @@ npm run build                     # prebuild copies ONNX Runtime WASM
 npm run test:e2e                  # serves dist via vite preview
 ```
 
-The Playwright suite runs against `dist`, so build before running it. The E2E
-suite includes a real-model depth flow (load + inference + 3-second WebM + depth
-PNG) that takes roughly 13 seconds on this machine with the WASM fallback; it
-runs on desktop and 375px mobile.
+`npm run test:e2e` builds `dist` first (via `pretest:e2e`) and serves it with
+`vite preview`, so the suite always runs against the current commit. It includes
+a real-model depth flow (load + inference + 3-second WebM + depth PNG) that takes
+roughly 13 seconds per viewport with the WASM fallback; the full desktop +
+375px-mobile suite takes about 45 seconds.
 
-## Measured M4 bundle
+## Architecture
+
+- `src/lib/depth/` — worker protocol, q4f16 WebGPU → q8 WASM fallback, and depth
+  normalization.
+- `src/lib/three/` — stage lifecycle, orbit/input state machine, CPU vertex
+  displacement, depth shader, and capture/export.
+- `src/hooks/` — upload validation, the depth state machine, and export state.
+- `src/components/` — upload zone, stage wrapper, depth status, and control bar.
+- `docs/decisions/` — ADR 0001 (rendering), 0002 (model loading), 0003 (export).
+
+See [docs/architecture.md](docs/architecture.md) for the data flow.
+
+## Measured build and performance
+
+Bundle (production build):
 
 - Initial JS: **78.5 KB gzip**, CSS 5.1 KB.
-- Lazy Three.js stage: **134.6 KB gzip**.
+- Lazy Three.js stage: **134.7 KB gzip**.
 - Depth worker chunk: 1.29 MB uncompressed, loaded only after an image is ready.
 - Self-hosted weights: **46.4 MB** total (q4f16 19.1 MB for WebGPU, q8 27.3 MB
   for WASM).
 - ONNX Runtime WASM is generated into `public/ort/` at dev/build time (26–28 MB
   per backend); it is not committed.
-- Test suite: 91 unit/component tests and 10 passing E2E tests (desktop + 375px
+
+Runtime depth pipeline — headless Chromium 156, **WASM q8 on CPU**, production
+build served from localhost, three runs averaged:
+
+| Phase | Cold (first image) | Second image (pipeline warm) |
+|---|---|---|
+| Decode + resize | 114 ms | included below |
+| Model load + init | 1.88 s | ~1 ms (pipeline cached in the worker) |
+| Inference | 5.47 s | 5.85 s |
+| **Total to depth-ready** | **7.46 s** | **6.04 s** |
+
+Machine: 12th Gen Intel Core i7-12700H (14C / 20T), 15.8 GB RAM, Windows 11.
+These are averages from a local preview server, not a benchmark: transfer time is
+negligible because the weights are local. **WebGPU was not exercised here**
+(headless Chromium exposes no `navigator.gpu`), so treat this as the CPU fallback
+baseline; the q4f16 WebGPU path is implemented but unmeasured.
+
+- Test suite: 97 unit/component tests and 10 passing E2E tests (desktop + 375px
   mobile, including the real-model depth/export flow).
+- Coverage: 84.3% statements / 73.7% branches over `src/lib` and `src/hooks`.
+  WebGL, worker, and download glue are excluded from the coverage denominator and
+  exercised by the E2E suite instead.
 
 The initial route stays under the 200 KB gzip budget.
 
@@ -111,6 +147,11 @@ The three sample images are **CC0 1.0**; authors and source pages are recorded i
 ## Known issues
 
 - **WebGPU unavailable** → the app uses q8 WASM; it is slower and the UI says so.
+- The **WebGPU q4f16 path has not been measured on real hardware yet**. CI and
+  the numbers above cover the CPU fallback only. A WebGPU row will be added once
+  it has been run on a machine with a real adapter.
+- The **mobile E2E project is Chromium touch emulation at 375px**, not WebKit.
+  Safari-specific behavior (notably WebM export) is documented but not yet in CI.
 - **First depth load is large** (tens of MB). The worker caches the pipeline in
   memory, so switching images is instant after initialization. A hard reload may
   refetch the files; the HTTP cache may help.
