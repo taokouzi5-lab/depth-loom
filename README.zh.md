@@ -2,13 +2,16 @@
 
 **把一张 2D 照片变成可拖拽的 3D 视差场景——全程在浏览器里完成。**
 
-简体中文 | [English](README.md)
+[![CI](https://github.com/taokouzi5-lab/depth-loom/actions/workflows/ci.yml/badge.svg)](https://github.com/taokouzi5-lab/depth-loom/actions/workflows/ci.yml)
+[![Deploy](https://github.com/taokouzi5-lab/depth-loom/actions/workflows/deploy.yml/badge.svg)](https://github.com/taokouzi5-lab/depth-loom/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**[在线 Demo](https://taokouzi5-lab.github.io/depth-loom/)** · 简体中文 | [English](README.md)
 
 Depth Loom 用 Depth Anything V2 Small 在本地估计深度，并把照片渲染成轻微位移
 的网格。图片不会上传，也没有后端。
 
-> 状态：**M5 — 双语文档与加固后的 CI。** GitHub Pages 部署与在线 Demo 链接
-> 待完成。
+> 状态：**M5 已完成——已上线 GitHub Pages，CI 已加固。**
 
 ## 已实现
 
@@ -67,9 +70,9 @@ PNG）在 WASM 回退下每个视口约 13 秒；桌面 + 375px 移动端全套�
 
 ## 部署
 
-GitHub Pages：[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 会跑
-与 CI 相同的门禁并发布 `dist`；在仓库设置里把 Pages 的 Source 选为
-**GitHub Actions**。
+在线地址：**https://taokouzi5-lab.github.io/depth-loom/**。GitHub Pages：
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 会跑与 CI 相同的
+门禁并发布 `dist`；Pages 的 Source 为 **GitHub Actions**。
 
 国内静态镜像（阿里云 OSS，可选自定义域名 + ICP）见
 [docs/hosting-mirror.md](docs/hosting-mirror.md)。

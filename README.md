@@ -2,13 +2,16 @@
 
 **Turn a 2D photo into a draggable 3D parallax scene — entirely in your browser.**
 
-English | [简体中文](README.zh.md)
+[![CI](https://github.com/taokouzi5-lab/depth-loom/actions/workflows/ci.yml/badge.svg)](https://github.com/taokouzi5-lab/depth-loom/actions/workflows/ci.yml)
+[![Deploy](https://github.com/taokouzi5-lab/depth-loom/actions/workflows/deploy.yml/badge.svg)](https://github.com/taokouzi5-lab/depth-loom/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**[Live demo](https://taokouzi5-lab.github.io/depth-loom/)** · English | [简体中文](README.zh.md)
 
 Depth Loom estimates depth locally with Depth Anything V2 Small and renders the
 photo as a subtly displaced mesh. Nothing is uploaded; there is no backend.
 
-> Status: **M5 — bilingual documentation and a hardened CI pipeline.**
-> GitHub Pages deployment and the online demo link are pending.
+> Status: **M5 complete — live on GitHub Pages with a hardened CI pipeline.**
 
 ## What works
 
@@ -78,9 +81,9 @@ roughly 13 seconds per viewport with the WASM fallback; the full desktop +
 
 ## Deployment
 
-GitHub Pages: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs
-the same gates as CI and publishes `dist`; enable Pages with **GitHub Actions**
-as the source.
+Live at **https://taokouzi5-lab.github.io/depth-loom/**. GitHub Pages:
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs the same gates
+as CI and publishes `dist`; Pages uses **GitHub Actions** as the source.
 
 For a mainland-China static mirror (Aliyun OSS, optional custom domain with ICP),
 see [docs/hosting-mirror.md](docs/hosting-mirror.md).
