@@ -2,10 +2,14 @@ import { LinearFilter, PlaneGeometry, SRGBColorSpace, CanvasTexture } from 'thre
 import type { DepthMap } from '../depth/protocol'
 
 /** Foreground/background separation in world units at strength 1. */
-export const LAYER_SEPARATION = 0.08
+export const LAYER_SEPARATION = 0.05
 
 /** Below this depth range the image is effectively flat; layers add nothing. */
 export const MIN_DEPTH_RANGE = 0.03
+
+/** Keep the outer frame on the foreground card so the far card never shows a
+ * gap at the image edge when the group rotates. */
+const BORDER_FRAME = 0.08
 
 const HISTOGRAM_BINS = 64
 
@@ -94,14 +98,23 @@ export function createMaskCanvas(
   const context = canvas.getContext('2d')
   if (!context) return null
 
+  const frameX = Math.max(1, Math.round(depth.width * BORDER_FRAME))
+  const frameY = Math.max(1, Math.round(depth.height * BORDER_FRAME))
   const image = context.createImageData(depth.width, depth.height)
   for (let index = 0; index < depth.data.length; index += 1) {
+    const x = index % depth.width
+    const y = Math.floor(index / depth.width)
+    const inFrame =
+      x < frameX ||
+      x >= depth.width - frameX ||
+      y < frameY ||
+      y >= depth.height - frameY
     const offset = index * 4
-    const isForeground = depth.data[index] > threshold
     image.data[offset] = 255
     image.data[offset + 1] = 255
     image.data[offset + 2] = 255
-    image.data[offset + 3] = isForeground ? 255 : 0
+    image.data[offset + 3] =
+      inFrame || depth.data[index] > threshold ? 255 : 0
   }
   context.putImageData(image, 0, 0)
   return canvas
@@ -123,7 +136,7 @@ export function createForegroundCanvas(
 
   context.drawImage(source, 0, 0)
   context.globalCompositeOperation = 'destination-in'
-  context.filter = 'blur(1.5px)'
+  context.filter = 'blur(3px)'
   context.drawImage(mask, 0, 0, canvas.width, canvas.height)
   context.filter = 'none'
   context.globalCompositeOperation = 'source-over'
@@ -306,7 +319,7 @@ export function createBackgroundCanvas(
 
   sharpContext.drawImage(source, 0, 0)
   sharpContext.globalCompositeOperation = 'destination-in'
-  sharpContext.filter = 'blur(1.5px)'
+  sharpContext.filter = 'blur(3px)'
   sharpContext.drawImage(inverseMask, 0, 0, sharp.width, sharp.height)
   sharpContext.filter = 'none'
   sharpContext.globalCompositeOperation = 'source-over'
