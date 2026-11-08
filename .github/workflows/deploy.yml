@@ -12,7 +12,8 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # A deploy that is still running must finish; cancelling it fails the run.
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -25,9 +26,15 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Deploy only publishes a commit that passes the same gates as CI.
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npx playwright install --with-deps chromium
       # vite.config.ts sets base to /depth-loom/ for production builds. If the
       # repository is renamed, update that base before enabling Pages.
-      - run: npm run build
+      # test:e2e builds dist via pretest:e2e; the uploaded artifact is that dist.
+      - run: npm run test:e2e
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

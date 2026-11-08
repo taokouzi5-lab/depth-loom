@@ -1,4 +1,4 @@
-import { useCallback, useState, type RefObject } from 'react'
+import { useCallback, useRef, useState, type RefObject } from 'react'
 import type { ViewMode } from '../components/controls/ControlBar'
 import { canvasToPng, downloadBlob } from '../lib/export/download'
 import type { Messages } from '../lib/i18n/messages'
@@ -22,10 +22,6 @@ function exportBaseName(fileName: string): string {
   return fileName.replace(/\.[^.]+$/, '') || 'depth-loom'
 }
 
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : '未知错误'
-}
-
 export function useStageExport({
   fileName,
   view,
@@ -36,9 +32,12 @@ export function useStageExport({
 }: UseStageExportOptions) {
   const [isExporting, setIsExporting] = useState(false)
   const [exportFeedback, setExportFeedback] = useState<ExportFeedback | null>(null)
+  // A ref closes the same-tick gap before `isExporting` re-renders.
+  const exportingRef = useRef(false)
 
   const exportPng = useCallback(async () => {
-    if (isExporting || fileName === null) return
+    if (exportingRef.current || fileName === null) return
+    exportingRef.current = true
     setIsExporting(true)
     setExportFeedback(null)
 
@@ -61,15 +60,19 @@ export function useStageExport({
     } catch (error) {
       setExportFeedback({
         kind: 'error',
-        text: `${t.app.exportFailed}${errorText(error)}`,
+        text: `${t.app.exportFailed}${
+          error instanceof Error ? error.message : t.app.unknownError
+        }`,
       })
     } finally {
+      exportingRef.current = false
       setIsExporting(false)
     }
-  }, [fileName, isExporting, stageRef, t, view])
+  }, [fileName, stageRef, t, view])
 
   const exportVideo = useCallback(async () => {
-    if (isExporting || !isDepthReady) return
+    if (exportingRef.current || !isDepthReady) return
+    exportingRef.current = true
     setIsExporting(true)
     setExportFeedback(null)
 
@@ -90,12 +93,15 @@ export function useStageExport({
     } catch (error) {
       setExportFeedback({
         kind: 'error',
-        text: `${t.app.exportFailed}${errorText(error)}`,
+        text: `${t.app.exportFailed}${
+          error instanceof Error ? error.message : t.app.unknownError
+        }`,
       })
     } finally {
+      exportingRef.current = false
       setIsExporting(false)
     }
-  }, [fileName, isDepthReady, isExporting, onChangeView, stageRef, t, view])
+  }, [fileName, isDepthReady, onChangeView, stageRef, t, view])
 
   const dismissExportFeedback = useCallback(() => {
     setExportFeedback(null)

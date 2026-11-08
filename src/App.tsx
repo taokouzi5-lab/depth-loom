@@ -57,87 +57,6 @@ export default function App({ createDepthClient }: AppProps) {
     fileInputRef.current?.click()
   }, [])
 
-  const handleFiles = useCallback(async (files: File[]) => {
-    const file = files[0]
-    if (!file) return
-
-    const validation = validateImageFile(file)
-    if (!validation.ok) {
-      setNotice({
-        code: validation.code,
-        message: t.errors[validation.code],
-      })
-      return
-    }
-
-    const job = latestJob.current + 1
-    latestJob.current = job
-    setIsDecoding(true)
-    setNotice(null)
-
-    try {
-      const image = await decodeImage(file)
-      if (latestJob.current !== job) return
-      setImageState({ status: 'ready', image })
-      setResetSignal(0)
-      setView('original')
-      setStrength(1)
-      userChoseView.current = false
-    } catch (error) {
-      if (latestJob.current !== job) return
-      const code: ImageErrorCode =
-        error instanceof ImageError ? error.code : 'decode_failed'
-      setNotice({ code, message: t.errors[code] })
-    } finally {
-      if (latestJob.current === job) {
-        setIsDecoding(false)
-      }
-    }
-  }, [t])
-
-  const handleSample = useCallback(
-    async (sample: SampleImage) => {
-      if (isDecoding || isFetchingSample) return
-      setIsFetchingSample(true)
-      setNotice(null)
-
-      try {
-        const response = await fetch(sample.src)
-        if (!response.ok) {
-          throw new Error(`Sample request failed: ${response.status}`)
-        }
-        const blob = await response.blob()
-        const file = new File([blob], sample.fileName, {
-          type: blob.type || 'image/jpeg',
-        })
-        await handleFiles([file])
-      } catch {
-        setNotice({
-          code: 'decode_failed',
-          message: t.errors.sampleFailed,
-        })
-      } finally {
-        setIsFetchingSample(false)
-      }
-    },
-    [handleFiles, isDecoding, isFetchingSample, t],
-  )
-
-  const handleFileInput = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const files = event.currentTarget.files
-      if (files) {
-        void handleFiles(Array.from(files))
-      }
-      // Allow selecting the same file again after a failed attempt.
-      event.currentTarget.value = ''
-    },
-    [handleFiles],
-  )
-
-  const { isDragging } = useFileDrop(handleFiles)
-  usePasteImage(handleFiles)
-
   const isReady = imageState.status === 'ready'
   // `?depth=off` is a lightweight original-only mode. It also lets upload E2E
   // tests skip the ~50 MB model download they do not need.
@@ -192,10 +111,87 @@ export default function App({ createDepthClient }: AppProps) {
     onChangeView: handleViewChange,
   })
 
-  useEffect(() => {
-    // A new image starts a fresh session; an old export notice would be stale.
-    dismissExportFeedback()
-  }, [imageState, dismissExportFeedback])
+  const handleFiles = useCallback(async (files: File[]) => {
+    const file = files[0]
+    if (!file) return
+
+    const validation = validateImageFile(file)
+    if (!validation.ok) {
+      setNotice({
+        code: validation.code,
+        message: t.errors[validation.code],
+      })
+      return
+    }
+
+    const job = latestJob.current + 1
+    latestJob.current = job
+    setIsDecoding(true)
+    setNotice(null)
+
+    try {
+      const image = await decodeImage(file)
+      if (latestJob.current !== job) return
+      setImageState({ status: 'ready', image })
+      setResetSignal(0)
+      setView('original')
+      setStrength(1)
+      dismissExportFeedback()
+      userChoseView.current = false
+    } catch (error) {
+      if (latestJob.current !== job) return
+      const code: ImageErrorCode =
+        error instanceof ImageError ? error.code : 'decode_failed'
+      setNotice({ code, message: t.errors[code] })
+    } finally {
+      if (latestJob.current === job) {
+        setIsDecoding(false)
+      }
+    }
+  }, [dismissExportFeedback, t])
+
+  const handleSample = useCallback(
+    async (sample: SampleImage) => {
+      if (isDecoding || isFetchingSample) return
+      setIsFetchingSample(true)
+      setNotice(null)
+
+      try {
+        const response = await fetch(sample.src)
+        if (!response.ok) {
+          throw new Error(`Sample request failed: ${response.status}`)
+        }
+        const blob = await response.blob()
+        const file = new File([blob], sample.fileName, {
+          type: blob.type || 'image/jpeg',
+        })
+        await handleFiles([file])
+      } catch {
+        setNotice({
+          code: 'decode_failed',
+          message: t.errors.sampleFailed,
+        })
+      } finally {
+        setIsFetchingSample(false)
+      }
+    },
+    [handleFiles, isDecoding, isFetchingSample, t],
+  )
+
+  const handleFileInput = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const files = event.currentTarget.files
+      if (files) {
+        void handleFiles(Array.from(files))
+      }
+      // Allow selecting the same file again after a failed attempt.
+      event.currentTarget.value = ''
+    },
+    [handleFiles],
+  )
+
+  const { isDragging } = useFileDrop(handleFiles)
+  usePasteImage(handleFiles)
 
   return (
     <div className="dl-app">

@@ -45,6 +45,7 @@ export interface Messages {
     exportFailed: string
     depthNotReady: string
     stageNotReady: string
+    unknownError: string
   }
   depth: {
     errorTitle: string
@@ -139,6 +140,7 @@ const zh: Messages = {
     exportFailed: '导出失败：',
     depthNotReady: '深度图还没有准备好。',
     stageNotReady: '3D 舞台还没有准备好。',
+    unknownError: '未知错误',
   },
   depth: {
     errorTitle: '深度估计失败',
@@ -234,6 +236,7 @@ const en: Messages = {
     exportFailed: 'Export failed: ',
     depthNotReady: 'The depth map is not ready yet.',
     stageNotReady: 'The 3D stage is not ready yet.',
+    unknownError: 'Unknown error',
   },
   depth: {
     errorTitle: 'Depth estimation failed',

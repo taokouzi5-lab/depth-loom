@@ -116,9 +116,9 @@ negligible because the weights are local. **WebGPU was not exercised here**
 (headless Chromium exposes no `navigator.gpu`), so treat this as the CPU fallback
 baseline; the q4f16 WebGPU path is implemented but unmeasured.
 
-- Test suite: 97 unit/component tests and 10 passing E2E tests (desktop + 375px
+- Test suite: 105 unit/component tests and 10 passing E2E tests (desktop + 375px
   mobile, including the real-model depth/export flow).
-- Coverage: 84.3% statements / 73.7% branches over `src/lib` and `src/hooks`.
+- Coverage: 92.4% statements / 82.1% branches over `src/lib` and `src/hooks`.
   WebGL, worker, and download glue are excluded from the coverage denominator and
   exercised by the E2E suite instead.
 
