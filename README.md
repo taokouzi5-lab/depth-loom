@@ -100,8 +100,22 @@ Bundle (production build):
 - ONNX Runtime WASM is generated into `public/ort/` at dev/build time (26–28 MB
   per backend); it is not committed.
 
-Runtime depth pipeline — headless Chromium 156, **WASM q8 on CPU**, production
-build served from localhost, three runs averaged:
+Production build served from localhost, three runs averaged. The app reported
+**WebGPU** (q4f16) on every run, so this is the real accelerated path:
+
+**WebGPU — Microsoft Edge 157 headless, NVIDIA Ampere adapter**
+
+| Phase | Cold (first image) | Second image (pipeline warm) |
+|---|---|---|
+| Decode + resize | 167 ms | included below |
+| Model load + init | 1.68 s | ~1 ms (pipeline cached in the worker) |
+| Inference | 1.31 s | 0.38 s |
+| **Total to depth-ready** | **3.16 s** | **0.45 s** |
+
+The first cold run includes browser warm-up (4.01 s); the next two were 2.71 s
+and 2.74 s. Warm inference ranged 374–382 ms.
+
+**WASM q8 fallback — headless Chromium 156, CPU**
 
 | Phase | Cold (first image) | Second image (pipeline warm) |
 |---|---|---|
@@ -112,9 +126,8 @@ build served from localhost, three runs averaged:
 
 Machine: 12th Gen Intel Core i7-12700H (14C / 20T), 15.8 GB RAM, Windows 11.
 These are averages from a local preview server, not a benchmark: transfer time is
-negligible because the weights are local. **WebGPU was not exercised here**
-(headless Chromium exposes no `navigator.gpu`), so treat this as the CPU fallback
-baseline; the q4f16 WebGPU path is implemented but unmeasured.
+negligible because the weights are local. CI runners have no GPU, so the E2E
+suite always exercises the CPU fallback; the WebGPU row is a local measurement.
 
 - Test suite: 105 unit/component tests and 10 passing E2E tests (desktop + 375px
   mobile, including the real-model depth/export flow).
@@ -147,9 +160,9 @@ The three sample images are **CC0 1.0**; authors and source pages are recorded i
 ## Known issues
 
 - **WebGPU unavailable** → the app uses q8 WASM; it is slower and the UI says so.
-- The **WebGPU q4f16 path has not been measured on real hardware yet**. CI and
-  the numbers above cover the CPU fallback only. A WebGPU row will be added once
-  it has been run on a machine with a real adapter.
+- **WebGPU is measured locally** (Edge 157, NVIDIA Ampere). CI runners have no
+  GPU, so the E2E suite always exercises the CPU fallback; the WebGPU row is not
+  re-measured on every release.
 - The **mobile E2E project is Chromium touch emulation at 375px**, not WebKit.
   Safari-specific behavior (notably WebM export) is documented but not yet in CI.
 - **First depth load is large** (tens of MB). The worker caches the pipeline in

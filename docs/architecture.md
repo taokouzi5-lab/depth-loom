@@ -84,12 +84,18 @@ chunk (M2) is loaded only when an image is ready.
 Measured build: initial JS 78.5 KB gzip, CSS 5.1 KB, lazy stage 134.7 KB gzip,
 depth worker 1.29 MB uncompressed.
 
-Measured depth pipeline (headless Chromium 156, WASM q8, CPU, local production
-preview, three runs averaged): decode 114 ms, model load + init 1.88 s, inference
-5.47 s, total to depth-ready 7.46 s on the first image; a second image with the
-worker's pipeline cached reaches ready in 6.04 s. Machine: i7-12700H, 15.8 GB
-RAM. WebGPU performance is not measured because this machine's headless Chromium
-has no `navigator.gpu`; the numbers above are the CPU fallback baseline.
+Measured depth pipeline on the same machine (i7-12700H, 15.8 GB RAM), local
+production preview, three runs averaged:
+
+- **WebGPU q4f16** (Edge 157 headless, NVIDIA Ampere): decode 167 ms, model load
+  + init 1.68 s, inference 1.31 s cold / 0.38 s warm; total to depth-ready 3.16 s
+  on the first image and 0.45 s on a second image with the pipeline cached.
+- **WASM q8 fallback** (headless Chromium 156, CPU): decode 114 ms, model load +
+  init 1.88 s, inference 5.47 s cold / 5.85 s warm; total 7.46 s cold and 6.04 s
+  warm.
+
+CI runners have no GPU, so the E2E suite always exercises the wasm fallback; the
+WebGPU numbers come from a local run.
 
 ## State model
 
