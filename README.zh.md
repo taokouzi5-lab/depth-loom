@@ -65,6 +65,15 @@ npm run test:e2e
 服务，因此测试永远跑在当前提交上。真实模型流程（加载 + 推理 + 3 秒 WebM + 深度
 PNG）在 WASM 回退下每个视口约 13 秒；桌面 + 375px 移动端全套约 45 秒。
 
+## 部署
+
+GitHub Pages：[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 会跑
+与 CI 相同的门禁并发布 `dist`；在仓库设置里把 Pages 的 Source 选为
+**GitHub Actions**。
+
+国内静态镜像（阿里云 OSS，可选自定义域名 + ICP）见
+[docs/hosting-mirror.md](docs/hosting-mirror.md)。
+
 ## 架构
 
 - `src/lib/depth/` — Worker 协议、q4f16 WebGPU → q8 WASM 回退、深度归一化。

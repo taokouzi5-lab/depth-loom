@@ -76,6 +76,15 @@ a real-model depth flow (load + inference + 3-second WebM + depth PNG) that take
 roughly 13 seconds per viewport with the WASM fallback; the full desktop +
 375px-mobile suite takes about 45 seconds.
 
+## Deployment
+
+GitHub Pages: [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs
+the same gates as CI and publishes `dist`; enable Pages with **GitHub Actions**
+as the source.
+
+For a mainland-China static mirror (Aliyun OSS, optional custom domain with ICP),
+see [docs/hosting-mirror.md](docs/hosting-mirror.md).
+
 ## Architecture
 
 - `src/lib/depth/` — worker protocol, q4f16 WebGPU → q8 WASM fallback, and depth
