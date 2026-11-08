@@ -92,9 +92,9 @@ class ImageStageController implements ImageStage {
     this.group.add(this.mesh)
     this.depthLayer = new DepthLayer(
       this.mesh,
-      this.geometry,
-      this.material,
       this.texture,
+      image.canvas,
+      this.group,
       () => this.requestRender(),
     )
     this.captureApi = createStageCaptureApi({
@@ -202,9 +202,9 @@ class ImageStageController implements ImageStage {
     this.mesh.material = nextMaterial
     this.depthLayer = new DepthLayer(
       this.mesh,
-      nextGeometry,
-      nextMaterial,
       nextTexture,
+      next.canvas,
+      this.group,
       () => this.requestRender(),
     )
 

@@ -1,58 +1,66 @@
-import type {
-  CanvasTexture,
+import {
+  Group,
   Mesh,
   MeshBasicMaterial,
-  PlaneGeometry,
-  ShaderMaterial,
+  type CanvasTexture,
+  type PlaneGeometry,
 } from 'three'
 import type { DepthMap } from '../depth/protocol'
-import { applyDepthDisplacement, clearDepthDisplacement } from './displacement'
-import { createDepthMaterial, createDepthTexture } from './depthMaterial'
+import {
+  computeLayerThreshold,
+  createBackgroundCanvas,
+  createForegroundCanvas,
+  createLayerGeometry,
+  createLayerTexture,
+  createMaskCanvas,
+  dilateMaskCanvas,
+  LAYER_SEPARATION,
+} from './layeredDepth'
 
 export type StageView = 'original' | '3d'
 
+const MASK_DILATION = 3
+const BACKGROUND_TINT = 0xffffff
+
 export class DepthLayer {
   private readonly mesh: Mesh
-  private readonly geometry: PlaneGeometry
-  private readonly baseMaterial: MeshBasicMaterial
   private readonly imageTexture: CanvasTexture
+  private readonly sourceCanvas: HTMLCanvasElement
+  private readonly parent: Group
   private readonly requestRender: () => void
 
+  private readonly layerGroup = new Group()
+  private layerGeometry: PlaneGeometry | null = null
+  private backgroundTexture: CanvasTexture | null = null
+  private foregroundTexture: CanvasTexture | null = null
+  private readonly layerMaterials: MeshBasicMaterial[] = []
+  private backgroundMesh: Mesh | null = null
+  private foregroundMesh: Mesh | null = null
+
   private depth: DepthMap | null = null
-  private depthTexture: CanvasTexture | null = null
-  private depthMaterial: ShaderMaterial | null = null
   private view: StageView = 'original'
   private strength = 1
 
   constructor(
     mesh: Mesh,
-    geometry: PlaneGeometry,
-    baseMaterial: MeshBasicMaterial,
     imageTexture: CanvasTexture,
+    sourceCanvas: HTMLCanvasElement,
+    parent: Group,
     requestRender: () => void,
   ) {
     this.mesh = mesh
-    this.geometry = geometry
-    this.baseMaterial = baseMaterial
     this.imageTexture = imageTexture
+    this.sourceCanvas = sourceCanvas
+    this.parent = parent
     this.requestRender = requestRender
+    this.layerGroup.visible = false
+    this.parent.add(this.layerGroup)
   }
 
   setDepth(depth: DepthMap | null): void {
     if (this.depth === depth) return
-    this.disposeDepthMaterial()
     this.depth = depth
-
-    if (depth) {
-      this.depthTexture = createDepthTexture(depth)
-      this.depthMaterial = createDepthMaterial({
-        image: this.imageTexture,
-        depth,
-        depthTexture: this.depthTexture,
-        strength: this.strength,
-      })
-    }
-
+    this.rebuildLayers()
     this.apply()
   }
 
@@ -66,38 +74,92 @@ export class DepthLayer {
     const next = Math.min(2, Math.max(0, strength))
     if (this.strength === next) return
     this.strength = next
-    if (this.depthMaterial) {
-      this.depthMaterial.uniforms.uStrength.value = next
-    }
+    this.updateLayerPositions()
     this.apply()
   }
 
   dispose(): void {
-    this.disposeDepthMaterial()
+    this.clearLayers()
     this.depth = null
     this.view = 'original'
-    this.mesh.material = this.baseMaterial
+    this.mesh.visible = true
+    this.parent.remove(this.layerGroup)
+  }
+
+  private rebuildLayers(): void {
+    this.clearLayers()
+    if (!this.depth) return
+
+    const threshold = computeLayerThreshold(this.depth)
+    if (threshold === null) return
+
+    const mask = createMaskCanvas(this.depth, threshold)
+    if (!mask) return
+
+    const expandedMask = dilateMaskCanvas(mask, MASK_DILATION) ?? mask
+    const foregroundCanvas = createForegroundCanvas(
+      this.sourceCanvas,
+      expandedMask,
+    )
+    if (!foregroundCanvas) return
+
+    const backgroundCanvas = createBackgroundCanvas(
+      this.sourceCanvas,
+      expandedMask,
+    )
+    const geometry = createLayerGeometry(
+      this.sourceCanvas.width / this.sourceCanvas.height,
+    )
+    this.layerGeometry = geometry
+    this.backgroundTexture = backgroundCanvas
+      ? createLayerTexture(backgroundCanvas)
+      : null
+    this.foregroundTexture = createLayerTexture(foregroundCanvas)
+
+    const backgroundMaterial = new MeshBasicMaterial({
+      map: this.backgroundTexture ?? this.imageTexture,
+      color: BACKGROUND_TINT,
+      toneMapped: false,
+    })
+    const foregroundMaterial = new MeshBasicMaterial({
+      map: this.foregroundTexture,
+      transparent: true,
+      toneMapped: false,
+    })
+    this.layerMaterials.push(backgroundMaterial, foregroundMaterial)
+
+    this.backgroundMesh = new Mesh(geometry, backgroundMaterial)
+    this.foregroundMesh = new Mesh(geometry, foregroundMaterial)
+    this.layerGroup.add(this.backgroundMesh, this.foregroundMesh)
+
+    this.updateLayerPositions()
+  }
+
+  private updateLayerPositions(): void {
+    const separation = LAYER_SEPARATION * this.strength
+    if (this.backgroundMesh) this.backgroundMesh.position.z = -separation
+    if (this.foregroundMesh) this.foregroundMesh.position.z = separation
   }
 
   private apply(): void {
-    if (this.view === '3d' && this.depth && this.depthMaterial) {
-      applyDepthDisplacement(this.geometry, this.depth, this.strength)
-      this.mesh.material = this.depthMaterial
-    } else {
-      clearDepthDisplacement(this.geometry)
-      this.mesh.material = this.baseMaterial
-    }
+    const useLayers = this.view === '3d' && this.foregroundMesh !== null
+    this.mesh.visible = !useLayers
+    this.layerGroup.visible = useLayers
     this.requestRender()
   }
 
-  private disposeDepthMaterial(): void {
-    if (this.depthMaterial) {
-      this.depthMaterial.dispose()
-      this.depthMaterial = null
-    }
-    if (this.depthTexture) {
-      this.depthTexture.dispose()
-      this.depthTexture = null
-    }
+  private clearLayers(): void {
+    for (const material of this.layerMaterials) material.dispose()
+    this.layerMaterials.length = 0
+    this.backgroundTexture?.dispose()
+    this.backgroundTexture = null
+    this.foregroundTexture?.dispose()
+    this.foregroundTexture = null
+    this.layerGeometry?.dispose()
+    this.layerGeometry = null
+    this.backgroundMesh = null
+    this.foregroundMesh = null
+    this.layerGroup.clear()
+    this.layerGroup.visible = false
   }
 }
