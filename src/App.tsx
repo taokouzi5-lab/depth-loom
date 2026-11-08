@@ -19,8 +19,8 @@ import { UploadZone, type UploadNotice } from './components/upload/UploadZone'
 import { useDepthEstimation } from './hooks/useDepthEstimation'
 import { useFileDrop } from './hooks/useFileDrop'
 import { usePasteImage } from './hooks/usePasteImage'
+import { useStageExport } from './hooks/useStageExport'
 import type { CreateDepthClient } from './lib/depth/protocol'
-import { canvasToPng, downloadBlob } from './lib/export/download'
 import { useI18n } from './lib/i18n/useI18n'
 import { decodeImage, type ProcessedImage } from './lib/image/decode'
 import { ImageError, type ImageErrorCode } from './lib/image/errors'
@@ -39,19 +39,6 @@ type AppProps = {
   createDepthClient: CreateDepthClient
 }
 
-function exportBaseName(fileName: string): string {
-  return fileName.replace(/\.[^.]+$/, '') || 'depth-loom'
-}
-
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : '未知错误'
-}
-
-type ExportFeedback = {
-  kind: 'info' | 'error'
-  text: string
-}
-
 export default function App({ createDepthClient }: AppProps) {
   const { t } = useI18n()
   const [imageState, setImageState] = useState<ImageState>({ status: 'empty' })
@@ -61,8 +48,6 @@ export default function App({ createDepthClient }: AppProps) {
   const [resetSignal, setResetSignal] = useState(0)
   const [view, setView] = useState<ViewMode>('original')
   const [strength, setStrength] = useState(1)
-  const [isExporting, setIsExporting] = useState(false)
-  const [exportFeedback, setExportFeedback] = useState<ExportFeedback | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const stageRef = useRef<ImageStage | null>(null)
   const latestJob = useRef(0)
@@ -97,7 +82,6 @@ export default function App({ createDepthClient }: AppProps) {
       setResetSignal(0)
       setView('original')
       setStrength(1)
-      setExportFeedback(null)
       userChoseView.current = false
     } catch (error) {
       if (latestJob.current !== job) return
@@ -193,69 +177,25 @@ export default function App({ createDepthClient }: AppProps) {
     stageRef.current = stage
   }, [])
 
-  const handleExportPng = useCallback(async () => {
-    if (isExporting || imageState.status !== 'ready') return
-    setIsExporting(true)
-    setExportFeedback(null)
+  const {
+    isExporting,
+    exportFeedback,
+    dismissExportFeedback,
+    exportPng,
+    exportVideo,
+  } = useStageExport({
+    fileName: imageState.status === 'ready' ? imageState.image.fileName : null,
+    view: activeView,
+    isDepthReady,
+    stageRef,
+    t,
+    onChangeView: handleViewChange,
+  })
 
-    try {
-      const base = exportBaseName(imageState.image.fileName)
-      let blob: Blob
-
-      if (activeView === 'depth') {
-        const depthCanvas =
-          document.querySelector<HTMLCanvasElement>('canvas.dl-depth-canvas')
-        if (!depthCanvas) throw new Error(t.app.depthNotReady)
-        blob = await canvasToPng(depthCanvas)
-      } else {
-        const stage = stageRef.current
-        if (!stage) throw new Error(t.app.stageNotReady)
-        blob = await stage.capturePng()
-      }
-
-      downloadBlob(blob, `${base}-${activeView}.png`)
-      setExportFeedback({ kind: 'info', text: t.app.exportPngDone })
-    } catch (error) {
-      setExportFeedback({
-        kind: 'error',
-        text: `${t.app.exportFailed}${errorText(error)}`,
-      })
-    } finally {
-      setIsExporting(false)
-    }
-  }, [activeView, imageState, isExporting, t])
-
-  const handleExportVideo = useCallback(async () => {
-    if (isExporting || !isDepthReady) return
-    setIsExporting(true)
-    setExportFeedback(null)
-
-    try {
-      if (activeView !== '3d') {
-        handleViewChange('3d')
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-        })
-      }
-
-      const stage = stageRef.current
-      if (!stage) throw new Error(t.app.stageNotReady)
-      const blob = await stage.recordLoop(3000)
-      const base =
-        imageState.status === 'ready'
-          ? exportBaseName(imageState.image.fileName)
-          : 'depth-loom'
-      downloadBlob(blob, `${base}-loop.webm`)
-      setExportFeedback({ kind: 'info', text: t.app.exportVideoDone })
-    } catch (error) {
-      setExportFeedback({
-        kind: 'error',
-        text: `${t.app.exportFailed}${errorText(error)}`,
-      })
-    } finally {
-      setIsExporting(false)
-    }
-  }, [activeView, handleViewChange, imageState, isDepthReady, isExporting, t])
+  useEffect(() => {
+    // A new image starts a fresh session; an old export notice would be stale.
+    dismissExportFeedback()
+  }, [imageState, dismissExportFeedback])
 
   return (
     <div className="dl-app">
@@ -345,7 +285,7 @@ export default function App({ createDepthClient }: AppProps) {
                 <button
                   type="button"
                   className="dl-toast__dismiss"
-                  onClick={() => setExportFeedback(null)}
+                  onClick={dismissExportFeedback}
                   aria-label={t.app.closeExportNotice}
                 >
                   ×
@@ -376,8 +316,8 @@ export default function App({ createDepthClient }: AppProps) {
           strength={strength}
           onStrengthChange={handleStrengthChange}
           isExporting={isExporting}
-          onExportPng={() => void handleExportPng()}
-          onExportVideo={() => void handleExportVideo()}
+          onExportPng={() => void exportPng()}
+          onExportVideo={() => void exportVideo()}
           onReset={() => setResetSignal((value) => value + 1)}
           onBrowse={openFilePicker}
         />

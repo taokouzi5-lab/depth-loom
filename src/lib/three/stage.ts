@@ -13,19 +13,12 @@ import type { ProcessedImage } from '../image/decode'
 import { computeCameraDistance } from './cameraFit'
 import { DepthLayer, type StageView } from './depthLayer'
 import { createImagePlaneGeometry } from './geometry'
-import {
-  applyLimitWithRubberBand,
-  clampAngle,
-  clampZoom,
-  damp,
-  dragToAngle,
-  PITCH_LIMIT,
-  YAW_LIMIT,
-} from './orbit'
+import { damp } from './orbit'
 import {
   createStageCaptureApi,
   type StageCaptureApi,
 } from './stageCapture'
+import { createStageInput, type StageInput } from './stageInput'
 import type { ImageStage, ImageStageOptions } from './stageTypes'
 import { createImageTexture } from './textures'
 
@@ -33,14 +26,9 @@ const FOV_DEG = 45
 const DESKTOP_FILL = 0.8
 const MOBILE_FILL = 0.72
 const MOBILE_WIDTH = 640
-const YAW_SWEEP = Math.PI * 0.5
-const PITCH_SWEEP = Math.PI * 0.35
-const WHEEL_ZOOM_SPEED = 0.0012
 const DRAG_LAMBDA = 14
 const SETTLE_EPSILON = 0.0002
 const MAX_DPR = 2
-const KEY_YAW_STEP = (2.5 * Math.PI) / 180
-const KEY_PITCH_STEP = (2 * Math.PI) / 180
 
 class ImageStageController implements ImageStage {
   private readonly container: HTMLElement
@@ -51,7 +39,7 @@ class ImageStageController implements ImageStage {
   private readonly group = new Group()
   private readonly mesh: Mesh
   private readonly resizeObserver: ResizeObserver
-  private readonly pointers = new Map<number, { x: number; y: number }>()
+  private readonly input: StageInput
 
   private currentImage: ProcessedImage
   private geometry: PlaneGeometry
@@ -69,15 +57,6 @@ class ImageStageController implements ImageStage {
   private targetPitch = 0
   private rafId = 0
   private lastTime = 0
-
-  private dragging = false
-  private dragPointerId: number | null = null
-  private dragStartX = 0
-  private dragStartY = 0
-  private dragStartYaw = 0
-  private dragStartPitch = 0
-  private pinchStartDistance = 0
-  private pinchStartZoom = 1
 
   constructor({ container, image, ariaLabel }: ImageStageOptions) {
     this.container = container
@@ -142,13 +121,33 @@ class ImageStageController implements ImageStage {
       requestRender: () => this.requestRender(),
     })
 
+    this.input = createStageInput({
+      canvas: this.canvas,
+      viewportWidth: () => this.viewportWidth(),
+      viewportHeight: () => this.viewportHeight(),
+      getTargetYaw: () => this.targetYaw,
+      getTargetPitch: () => this.targetPitch,
+      getTargetZoom: () => this.targetZoom,
+      setTargetYaw: (value) => {
+        this.targetYaw = value
+      },
+      setTargetPitch: (value) => {
+        this.targetPitch = value
+      },
+      setTargetZoom: (value) => {
+        this.targetZoom = value
+      },
+      reset: () => this.reset(),
+      requestRender: () => this.requestRender(),
+    })
+
     this.resizeObserver = new ResizeObserver(() => {
       this.fitCamera()
       this.requestRender()
     })
     this.resizeObserver.observe(container)
 
-    this.attachInput()
+    this.input.attach()
     this.fitCamera()
     this.requestRender()
   }
@@ -225,8 +224,7 @@ class ImageStageController implements ImageStage {
     if (this.rafId !== 0) cancelAnimationFrame(this.rafId)
     this.rafId = 0
     this.resizeObserver.disconnect()
-    this.detachInput()
-    this.pointers.clear()
+    this.input.detach()
     this.depthLayer.dispose()
     this.geometry.dispose()
     this.texture.dispose()
@@ -298,154 +296,6 @@ class ImageStageController implements ImageStage {
     this.rafId = settled ? 0 : requestAnimationFrame(this.tick)
   }
 
-  private pointerDistance(): number {
-    const points = Array.from(this.pointers.values())
-    const first = points[0]
-    const second = points[1]
-    if (!first || !second) return 0
-    return Math.hypot(first.x - second.x, first.y - second.y)
-  }
-
-  private readonly handlePointerDown = (event: PointerEvent): void => {
-    event.preventDefault()
-    this.canvas.focus({ preventScroll: true })
-    this.canvas.setPointerCapture(event.pointerId)
-    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
-
-    if (this.pointers.size === 1) {
-      this.dragging = true
-      this.dragPointerId = event.pointerId
-      this.dragStartX = event.clientX
-      this.dragStartY = event.clientY
-      this.dragStartYaw = this.targetYaw
-      this.dragStartPitch = this.targetPitch
-    } else if (this.pointers.size === 2) {
-      this.dragging = false
-      this.dragPointerId = null
-      this.pinchStartDistance = this.pointerDistance()
-      this.pinchStartZoom = this.targetZoom
-    }
-  }
-
-  private readonly handlePointerMove = (event: PointerEvent): void => {
-    if (!this.pointers.has(event.pointerId)) return
-    this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
-
-    if (this.pointers.size >= 2 && this.pinchStartDistance > 0) {
-      const distance = this.pointerDistance()
-      this.targetZoom = clampZoom(
-        this.pinchStartZoom * (distance / this.pinchStartDistance),
-      )
-      this.requestRender()
-      return
-    }
-
-    if (!this.dragging || this.dragPointerId !== event.pointerId) return
-
-    const dx = event.clientX - this.dragStartX
-    const dy = event.clientY - this.dragStartY
-    this.targetYaw = applyLimitWithRubberBand(
-      this.dragStartYaw + dragToAngle(dx, this.viewportWidth(), YAW_SWEEP),
-      YAW_LIMIT,
-    )
-    this.targetPitch = applyLimitWithRubberBand(
-      this.dragStartPitch + dragToAngle(-dy, this.viewportHeight(), PITCH_SWEEP),
-      PITCH_LIMIT,
-    )
-    this.requestRender()
-  }
-
-  private readonly handlePointerUp = (event: PointerEvent): void => {
-    this.pointers.delete(event.pointerId)
-
-    if (this.pointers.size >= 2) {
-      // A third finger left: re-baseline the pinch instead of jumping.
-      this.pinchStartDistance = this.pointerDistance()
-      this.pinchStartZoom = this.targetZoom
-      this.dragging = false
-      this.dragPointerId = null
-      this.requestRender()
-      return
-    }
-
-    this.pinchStartDistance = 0
-
-    if (this.pointers.size === 0) {
-      this.dragging = false
-      this.dragPointerId = null
-      this.targetYaw = clampAngle(this.targetYaw, YAW_LIMIT)
-      this.targetPitch = clampAngle(this.targetPitch, PITCH_LIMIT)
-      this.requestRender()
-      return
-    }
-
-    const remaining = Array.from(this.pointers.entries())[0]
-    if (!remaining) return
-
-    const [pointerId, point] = remaining
-    this.dragging = true
-    this.dragPointerId = pointerId
-    this.dragStartX = point.x
-    this.dragStartY = point.y
-    this.dragStartYaw = this.targetYaw
-    this.dragStartPitch = this.targetPitch
-    this.requestRender()
-  }
-
-  private readonly handleWheel = (event: WheelEvent): void => {
-    event.preventDefault()
-    this.targetZoom = clampZoom(
-      this.targetZoom * Math.exp(-event.deltaY * WHEEL_ZOOM_SPEED),
-    )
-    this.requestRender()
-  }
-
-  private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === 'Home') {
-      event.preventDefault()
-      this.reset()
-      return
-    }
-
-    if (event.key === 'ArrowLeft') {
-      this.targetYaw = clampAngle(this.targetYaw - KEY_YAW_STEP, YAW_LIMIT)
-    } else if (event.key === 'ArrowRight') {
-      this.targetYaw = clampAngle(this.targetYaw + KEY_YAW_STEP, YAW_LIMIT)
-    } else if (event.key === 'ArrowUp') {
-      this.targetPitch = clampAngle(this.targetPitch + KEY_PITCH_STEP, PITCH_LIMIT)
-    } else if (event.key === 'ArrowDown') {
-      this.targetPitch = clampAngle(this.targetPitch - KEY_PITCH_STEP, PITCH_LIMIT)
-    } else {
-      return
-    }
-
-    event.preventDefault()
-    this.requestRender()
-  }
-
-  private readonly handleDoubleClick = (): void => {
-    this.reset()
-  }
-
-  private attachInput(): void {
-    this.canvas.addEventListener('pointerdown', this.handlePointerDown)
-    this.canvas.addEventListener('pointermove', this.handlePointerMove)
-    this.canvas.addEventListener('pointerup', this.handlePointerUp)
-    this.canvas.addEventListener('pointercancel', this.handlePointerUp)
-    this.canvas.addEventListener('wheel', this.handleWheel, { passive: false })
-    this.canvas.addEventListener('keydown', this.handleKeyDown)
-    this.canvas.addEventListener('dblclick', this.handleDoubleClick)
-  }
-
-  private detachInput(): void {
-    this.canvas.removeEventListener('pointerdown', this.handlePointerDown)
-    this.canvas.removeEventListener('pointermove', this.handlePointerMove)
-    this.canvas.removeEventListener('pointerup', this.handlePointerUp)
-    this.canvas.removeEventListener('pointercancel', this.handlePointerUp)
-    this.canvas.removeEventListener('wheel', this.handleWheel)
-    this.canvas.removeEventListener('keydown', this.handleKeyDown)
-    this.canvas.removeEventListener('dblclick', this.handleDoubleClick)
-  }
 }
 
 export function createImageStage(options: ImageStageOptions): ImageStage {
