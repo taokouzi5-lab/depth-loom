@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react'
-import type { DepthMap } from '../../lib/depth/protocol'
+import type { BackgroundImage, DepthMap } from '../../lib/depth/protocol'
 import { useI18n } from '../../lib/i18n/useI18n'
 import type { ProcessedImage } from '../../lib/image/decode'
 import type { StageView } from '../../lib/three/depthLayer'
@@ -10,6 +10,7 @@ import './depth-stage.css'
 type DepthStageProps = {
   image: ProcessedImage
   depth: DepthMap | null
+  background: BackgroundImage | null
   view: StageView
   strength: number
   resetSignal?: number
@@ -19,6 +20,7 @@ type DepthStageProps = {
 export default function DepthStage({
   image,
   depth,
+  background,
   view,
   strength,
   resetSignal = 0,
@@ -77,6 +79,10 @@ export default function DepthStage({
   useEffect(() => {
     stageRef.current?.setDepth(depth)
   }, [depth])
+
+  useEffect(() => {
+    stageRef.current?.setBackground(background)
+  }, [background])
 
   useEffect(() => {
     stageRef.current?.setView(view)

@@ -36,6 +36,7 @@ export class DepthLayer {
   private readonly layerMaterials: MeshBasicMaterial[] = []
   private backgroundMesh: Mesh | null = null
   private foregroundMesh: Mesh | null = null
+  private aiBackgroundCanvas: HTMLCanvasElement | null = null
 
   private depth: DepthMap | null = null
   private view: StageView = 'original'
@@ -60,8 +61,22 @@ export class DepthLayer {
   setDepth(depth: DepthMap | null): void {
     if (this.depth === depth) return
     this.depth = depth
+    this.aiBackgroundCanvas = null
     this.rebuildLayers()
     this.apply()
+  }
+
+  setBackgroundCanvas(canvas: HTMLCanvasElement | null): void {
+    this.aiBackgroundCanvas = canvas
+    if (!canvas || !this.backgroundMesh) return
+
+    const texture = createLayerTexture(canvas)
+    const material = this.backgroundMesh.material as MeshBasicMaterial
+    material.map = texture
+    material.needsUpdate = true
+    this.backgroundTexture?.dispose()
+    this.backgroundTexture = texture
+    this.requestRender()
   }
 
   setView(view: StageView): void {
@@ -80,6 +95,7 @@ export class DepthLayer {
 
   dispose(): void {
     this.clearLayers()
+    this.aiBackgroundCanvas = null
     this.depth = null
     this.view = 'original'
     this.mesh.visible = true
@@ -103,10 +119,9 @@ export class DepthLayer {
     )
     if (!foregroundCanvas) return
 
-    const backgroundCanvas = createBackgroundCanvas(
-      this.sourceCanvas,
-      expandedMask,
-    )
+    const backgroundCanvas =
+      this.aiBackgroundCanvas ??
+      createBackgroundCanvas(this.sourceCanvas, expandedMask)
     const geometry = createLayerGeometry(
       this.sourceCanvas.width / this.sourceCanvas.height,
     )

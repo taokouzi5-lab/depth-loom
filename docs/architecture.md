@@ -24,10 +24,12 @@ File
        ImageData → RawImage → Depth Anything V2 Small
        → predicted_depth (interpolated to the input size)
        → per-image min/max normalize → Float32Array
+       → foreground mask (Otsu + dilation)
+       → LaMa crop at 512 → inpainted background plate
   → view mode:
        original → flat MeshBasicMaterial plane
        depth    → grayscale depth canvas overlay
-       3D       → CPU vertex displacement + custom fragment shader
+       3D       → foreground cutout card + inpainted background card
   → render
   → export:
        PNG  → current view canvas flattened onto #0a0a0b
@@ -39,17 +41,20 @@ depth-map view. M3 adds the displaced 3D mesh, depth-derived shading/fog, the
 strength slider, and the three view modes. The first depth result auto-switches
 to 3D unless the user has already chosen a view. M4 adds three CC0 samples,
 PNG/WebM export, Chinese/English UI, and mobile depth E2E coverage. M5 adds
-bilingual documentation and a CI E2E job; GitHub Pages deployment is pending.
+bilingual documentation, CI E2E, and GitHub Pages deployment. Post-M5 replaces
+the continuous relief with a two-layer cutout renderer and adds LaMa background
+inpainting behind the foreground.
 
-The worker keeps a single pipeline instance. The first image pays the
-model/ORT load; subsequent images reuse the in-memory weights. The transfer to
-the main thread is an `ArrayBuffer` (zero-copy) and contains normalized
-`Float32Array` values plus dimensions.
+The worker keeps one depth pipeline and one LaMa session. The first image pays
+the model/ORT load; subsequent images reuse both. Depth is transferred to the
+main thread as an `ArrayBuffer`; the inpainted background follows as a second
+RGBA `ArrayBuffer` after LaMa finishes.
 
-Model files live in `public/models/depth-anything-v2-small/` and are committed.
-ONNX Runtime WASM binaries are copied from `node_modules/onnxruntime-web/dist`
-into `public/ort/` by `scripts/copy-ort.mjs` on `predev`/`prebuild`; they are
-generated artifacts and are not committed.
+Model files live in `public/models/depth-anything-v2-small/` and
+`public/models/lama/`, and are committed. ONNX Runtime WASM binaries are copied
+from `node_modules/onnxruntime-web/dist` into `public/ort/` by
+`scripts/copy-ort.mjs` on `predev`/`prebuild`; they are generated artifacts and
+are not committed.
 
 ## Module boundaries
 
@@ -57,7 +62,7 @@ generated artifacts and are not committed.
 |---|---|---|
 | UI shell | `src/App.tsx`, `src/components` | Upload affordances, states, accessible chrome |
 | Image pipeline | `src/lib/image` | Validation, EXIF-aware decode, resize |
-| Depth pipeline | `src/lib/depth` | Worker protocol, ONNX/model config, normalization |
+| Depth pipeline | `src/lib/depth` | Worker protocol, model config, normalization, Otsu mask, LaMa inpainting |
 | Three stage | `src/lib/three` | Camera fit, orbit/input state machines, renderer lifecycle, capture/recording |
 | Depth layer | `src/lib/three/depthLayer.ts`, `depthMaterial.ts` | Depth texture, displacement material, mode switching |
 | Export | `src/lib/export/download.ts` | PNG flattening and browser download |

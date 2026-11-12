@@ -59,6 +59,7 @@ export interface Messages {
     mapLabel: string
     mapHint: string
     canvasAria: string
+    inpainting: string
   }
   controls: {
     group: string
@@ -154,6 +155,7 @@ const zh: Messages = {
     mapLabel: 'DEPTH MAP',
     mapHint: '越亮越近',
     canvasAria: '深度图，越亮表示越近',
+    inpainting: 'AI 补全背景中…',
   },
   controls: {
     group: '视图控制',
@@ -250,6 +252,7 @@ const en: Messages = {
     mapLabel: 'DEPTH MAP',
     mapHint: 'Brighter is nearer',
     canvasAria: 'Depth map; brighter means nearer',
+    inpainting: 'Filling the background with AI…',
   },
   controls: {
     group: 'View controls',

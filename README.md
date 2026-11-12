@@ -25,6 +25,10 @@ photo as a subtly displaced mesh. Nothing is uploaded; there is no backend.
   shows a "CPU mode · slower" badge.
 - Model loading has byte progress; inference has a distinct state; a failed load
   shows an explicit error with retry.
+- **Background inpainting with LaMa**: after depth, the same worker crops around
+  the foreground, runs a self-hosted 92.6 MB LaMa ONNX model at 512px, and
+  composites the generated pixels behind the cutout. The session is cached; if
+  the model fails, the classical fill is used.
 - **3D view**: the normalized depth field drives CPU vertex displacement on the
   257×257 plane; a custom fragment shader derives relief normals from the depth
   texture and adds depth-based fog. The 5% edge bleed and ±25°/±15° orbit limits
@@ -107,8 +111,9 @@ Bundle (production build):
 - Initial JS: **78.5 KB gzip**, CSS 5.1 KB.
 - Lazy Three.js stage: **134.7 KB gzip**.
 - Depth worker chunk: 1.29 MB uncompressed, loaded only after an image is ready.
-- Self-hosted weights: **46.4 MB** total (q4f16 19.1 MB for WebGPU, q8 27.3 MB
-  for WASM).
+- Self-hosted weights: **139.0 MB** total — Depth Anything V2 Small 46.4 MB
+  (q4f16 19.1 MB for WebGPU, q8 27.3 MB for WASM) plus the 92.6 MB LaMa
+  inpainting model.
 - ONNX Runtime WASM is generated into `public/ort/` at dev/build time (26–28 MB
   per backend); it is not committed.
 
@@ -141,9 +146,15 @@ These are averages from a local preview server, not a benchmark: transfer time i
 negligible because the weights are local. CI runners have no GPU, so the E2E
 suite always exercises the CPU fallback; the WebGPU row is a local measurement.
 
-- Test suite: 105 unit/component tests and 14 E2E tests (desktop Chromium, 375px
+The LaMa fill runs after depth, on the CPU (WASM). On this machine the first run
+took about **37 s end to end** from page load through depth, the 92.6 MB model
+download, and session initialization; the session stays in the worker, so later
+images skip the download and model init. The fill is composited only inside the
+foreground mask; the rest of the plate is the untouched photo.
+
+- Test suite: 116 unit/component tests and 14 E2E tests (desktop Chromium, 375px
   Chromium with the real-model depth/export flow, and a 375px WebKit subset).
-- Coverage: 92.4% statements / 82.1% branches over `src/lib` and `src/hooks`.
+- Coverage: 93.6% statements / 84.5% branches over `src/lib` and `src/hooks`.
   WebGL, worker, and download glue are excluded from the coverage denominator and
   exercised by the E2E suite instead.
 
@@ -178,9 +189,11 @@ The three sample images are **CC0 1.0**; authors and source pages are recorded i
 - **Safari is covered by a 375px WebKit subset** (layout, upload, i18n, samples,
   PNG). The real-model depth flow and WebM export stay Chromium-only because
   WebKit has no WebM encoder; Safari users see an explicit export error.
-- **First depth load is large** (tens of MB). The worker caches the pipeline in
-  memory, so switching images is instant after initialization. A hard reload may
-  refetch the files; the HTTP cache may help.
+- **First load is large** (about 139 MB across depth and inpainting). The worker
+  caches both sessions, so switching images skips model initialization. A hard
+  reload may refetch the files; the HTTP cache may help.
+- **AI background fill is approximate** and runs on the CPU; it can take several
+  seconds per image. If it fails, the classical fill is used instead.
 - **No inpainting**: the 3D view is constrained to ±25° yaw / ±15° pitch. Beyond
   that, foreground disocclusion would show gaps. The 5% edge bleed and depth fog
   reduce edge artifacts; they do not replace inpainting.

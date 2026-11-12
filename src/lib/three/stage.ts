@@ -8,7 +8,7 @@ import {
   WebGLRenderer,
 } from 'three'
 import type { CanvasTexture, PlaneGeometry } from 'three'
-import type { DepthMap } from '../depth/protocol'
+import type { BackgroundImage, DepthMap } from '../depth/protocol'
 import type { ProcessedImage } from '../image/decode'
 import { computeCameraDistance } from './cameraFit'
 import { DepthLayer, type StageView } from './depthLayer'
@@ -169,6 +169,29 @@ class ImageStageController implements ImageStage {
 
   setDepth(depth: DepthMap | null): void {
     this.depthLayer.setDepth(depth)
+  }
+
+  setBackground(background: BackgroundImage | null): void {
+    if (!background) {
+      this.depthLayer.setBackgroundCanvas(null)
+      return
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = background.width
+    canvas.height = background.height
+    const context = canvas.getContext('2d')
+    if (!context) return
+    context.putImageData(
+      new ImageData(
+        new Uint8ClampedArray(background.buffer),
+        background.width,
+        background.height,
+      ),
+      0,
+      0,
+    )
+    this.depthLayer.setBackgroundCanvas(canvas)
   }
 
   setView(view: StageView): void {

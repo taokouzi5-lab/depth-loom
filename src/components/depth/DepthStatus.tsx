@@ -1,4 +1,5 @@
 ﻿import type {
+  BackgroundStatus,
   DepthMode,
   DepthProgress,
   DepthStatus as DepthStatusValue,
@@ -12,6 +13,8 @@ type DepthStatusProps = {
   mode: DepthMode | null
   error: string | null
   onRetry: () => void
+  backgroundStatus?: BackgroundStatus
+  backgroundProgress?: DepthProgress | null
 }
 
 export function DepthStatus({
@@ -20,6 +23,8 @@ export function DepthStatus({
   mode,
   error,
   onRetry,
+  backgroundStatus = 'idle',
+  backgroundProgress = null,
 }: DepthStatusProps) {
   const { t } = useI18n()
 
@@ -41,12 +46,24 @@ export function DepthStatus({
 
   if (status === 'ready') {
     return (
-      <div className="dl-depth-status dl-depth-status--ready" role="status">
+      <div
+        className="dl-depth-status dl-depth-status--ready"
+        role="status"
+        data-background-status={backgroundStatus}
+      >
         <span className="dl-depth-status__dot" aria-hidden="true" />
         <span>{t.depth.ready}</span>
         {mode && (
           <span className="dl-depth-status__badge">
             {mode === 'wasm' ? t.depth.cpuBadge : t.depth.webgpuBadge}
+          </span>
+        )}
+        {backgroundStatus === 'loading' && (
+          <span className="dl-depth-status__detail">
+            {t.depth.inpainting}
+            {backgroundProgress
+              ? ` ${Math.round(backgroundProgress.progress)}%`
+              : ''}
           </span>
         )}
       </div>

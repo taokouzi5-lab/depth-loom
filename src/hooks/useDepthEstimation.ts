@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProcessedImage } from '../lib/image/decode'
 import type {
+  BackgroundImage,
+  BackgroundStatus,
   CreateDepthClient,
   DepthClient,
   DepthMap,
+  DepthProgress,
   DepthState,
   DepthWorkerResponse,
 } from '../lib/depth/protocol'
 
 export interface UseDepthEstimationResult extends DepthState {
   retry: () => void
+  background: BackgroundImage | null
+  backgroundStatus: BackgroundStatus
+  backgroundProgress: DepthProgress | null
 }
 
 function createIdleState(): DepthState {
@@ -31,6 +37,11 @@ export function useDepthEstimation(
   createClient: CreateDepthClient,
 ): UseDepthEstimationResult {
   const [state, setState] = useState<DepthState>(createIdleState)
+  const [background, setBackground] = useState<BackgroundImage | null>(null)
+  const [backgroundStatus, setBackgroundStatus] =
+    useState<BackgroundStatus>('idle')
+  const [backgroundProgress, setBackgroundProgress] =
+    useState<DepthProgress | null>(null)
   const clientRef = useRef<DepthClient | null>(null)
   const activeRequest = useRef(0)
   const lastImage = useRef<ProcessedImage | null>(null)
@@ -58,6 +69,40 @@ export function useDepthEstimation(
     }
 
     if (message.requestId !== -1 && message.requestId !== activeRequest.current) {
+      return
+    }
+
+    if (message.type === 'background-start') {
+      setBackground(null)
+      setBackgroundStatus('loading')
+      setBackgroundProgress(null)
+      return
+    }
+
+    if (message.type === 'inpaint-progress') {
+      setBackgroundStatus('loading')
+      setBackgroundProgress({
+        loaded: message.loaded,
+        total: message.total,
+        progress: message.progress,
+      })
+      return
+    }
+
+    if (message.type === 'background') {
+      setBackground({
+        buffer: message.buffer,
+        width: message.width,
+        height: message.height,
+      })
+      setBackgroundStatus('ready')
+      setBackgroundProgress(null)
+      return
+    }
+
+    if (message.type === 'background-error') {
+      setBackgroundStatus('error')
+      setBackgroundProgress(null)
       return
     }
 
@@ -127,6 +172,9 @@ export function useDepthEstimation(
 
       const requestId = activeRequest.current + 1
       activeRequest.current = requestId
+      setBackground(null)
+      setBackgroundStatus('idle')
+      setBackgroundProgress(null)
       setState({
         status: 'loading',
         progress: null,
@@ -182,5 +230,11 @@ export function useDepthEstimation(
     }
   }, [start])
 
-  return { ...state, retry }
+  return {
+    ...state,
+    retry,
+    background,
+    backgroundStatus,
+    backgroundProgress,
+  }
 }

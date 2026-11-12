@@ -222,6 +222,7 @@ export default function App({ createDepthClient }: AppProps) {
                 <DepthStage
                   image={imageState.image}
                   depth={depth.depth}
+                  background={depth.background}
                   view={activeView === '3d' ? '3d' : 'original'}
                   strength={strength}
                   resetSignal={resetSignal}
@@ -245,6 +246,8 @@ export default function App({ createDepthClient }: AppProps) {
               progress={depth.progress}
               mode={depth.mode}
               error={depth.error}
+              backgroundStatus={depth.backgroundStatus}
+              backgroundProgress={depth.backgroundProgress}
               onRetry={() => {
                 userChoseView.current = false
                 setView('original')

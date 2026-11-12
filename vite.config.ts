@@ -71,6 +71,7 @@ export default defineConfig(({ mode }) => ({
         'src/lib/three/stage.ts',
         'src/lib/three/stageCapture.ts',
         'src/lib/three/depthLayer.ts',
+        'src/lib/three/layeredDepth.ts',
         'src/lib/three/depthMaterial.ts',
         'src/lib/three/textures.ts',
         'src/lib/depth/depth.worker.ts',

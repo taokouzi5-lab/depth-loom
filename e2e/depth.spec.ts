@@ -13,7 +13,12 @@ test('estimates depth locally and renders the depth map', async ({ page }) => {
 
   const consoleErrors: string[] = []
   page.on('console', (message) => {
-    if (message.type() === 'error') {
+    // ORT prints harmless initializer-cleanup warnings as console errors when
+    // the LaMa session is created; they are not application errors.
+    if (
+      message.type() === 'error' &&
+      !message.text().includes('onnxruntime')
+    ) {
       consoleErrors.push(message.text())
     }
   })

@@ -1,90 +1,20 @@
 import { LinearFilter, PlaneGeometry, SRGBColorSpace, CanvasTexture } from 'three'
+import { computeDepthThreshold } from '../depth/mask'
 import type { DepthMap } from '../depth/protocol'
 
 /** Foreground/background separation in world units at strength 1. */
 export const LAYER_SEPARATION = 0.035
 
-/** Below this depth range the image is effectively flat; layers add nothing. */
-export const MIN_DEPTH_RANGE = 0.03
-
 /** Keep the outer frame on the foreground card so the far card never shows a
  * gap at the image edge when the group rotates. */
 const BORDER_FRAME = 0.08
 
-const HISTOGRAM_BINS = 64
-
-/**
- * Otsu split on the normalized depth histogram. Returns null when the depth
- * range is too small to separate meaningful layers.
- */
+/** Otsu split shared with the inpainting mask. Null when the image is flat. */
 export function computeLayerThreshold(depth: DepthMap): number | null {
   if (depth.width <= 0 || depth.height <= 0 || depth.data.length === 0) {
     return null
   }
-
-  let min = 1
-  let max = 0
-  for (const value of depth.data) {
-    if (value < min) min = value
-    if (value > max) max = value
-  }
-  if (max - min < MIN_DEPTH_RANGE) return null
-
-  const histogram = new Array<number>(HISTOGRAM_BINS).fill(0)
-  for (const value of depth.data) {
-    const bin = Math.min(
-      HISTOGRAM_BINS - 1,
-      Math.max(0, Math.floor(value * HISTOGRAM_BINS)),
-    )
-    histogram[bin] += 1
-  }
-
-  const total = depth.data.length
-  let totalSum = 0
-  for (let bin = 0; bin < HISTOGRAM_BINS; bin += 1) {
-    totalSum += bin * histogram[bin]
-  }
-
-  let backgroundWeight = 0
-  let backgroundSum = 0
-  let bestBin = 0
-  let bestVariance = -1
-
-  for (let bin = 0; bin < HISTOGRAM_BINS; bin += 1) {
-    backgroundWeight += histogram[bin]
-    if (backgroundWeight === 0) continue
-    const foregroundWeight = total - backgroundWeight
-    if (foregroundWeight === 0) break
-
-    backgroundSum += bin * histogram[bin]
-    const backgroundMean = backgroundSum / backgroundWeight
-    const foregroundMean = (totalSum - backgroundSum) / foregroundWeight
-    const variance =
-      backgroundWeight * foregroundWeight * (backgroundMean - foregroundMean) ** 2
-
-    if (variance > bestVariance) {
-      bestVariance = variance
-      bestBin = bin
-    }
-  }
-
-  // Split midway between the two class means instead of at the Otsu bin edge;
-  // this keeps a single bright cluster from being half-classified as background.
-  let classWeight = 0
-  let classSum = 0
-  for (let bin = 0; bin <= bestBin; bin += 1) {
-    classWeight += histogram[bin]
-    classSum += bin * histogram[bin]
-  }
-  const remainingWeight = total - classWeight
-  if (classWeight === 0 || remainingWeight === 0) {
-    return (bestBin + 0.5) / HISTOGRAM_BINS
-  }
-
-  const backgroundMean = classSum / classWeight
-  const foregroundMean = (totalSum - classSum) / remainingWeight
-  const midpoint = (backgroundMean + foregroundMean) / 2
-  return Math.min(1, Math.max(0, (midpoint + 0.5) / HISTOGRAM_BINS))
+  return computeDepthThreshold(depth.data)
 }
 
 /** White-with-alpha mask at depth-map resolution. Alpha 255 = foreground. */

@@ -2,6 +2,8 @@ export type DepthMode = 'webgpu' | 'wasm'
 
 export type DepthStatus = 'idle' | 'loading' | 'estimating' | 'ready' | 'error'
 
+export type BackgroundStatus = 'idle' | 'loading' | 'ready' | 'error'
+
 export interface DepthProgress {
   loaded: number
   total: number
@@ -21,6 +23,12 @@ export interface DepthState {
   mode: DepthMode | null
   depth: DepthMap | null
   error: string | null
+}
+
+export interface BackgroundImage {
+  buffer: ArrayBuffer
+  width: number
+  height: number
 }
 
 export interface DepthEstimateRequest {
@@ -51,6 +59,22 @@ export type DepthWorkerResponse =
       height: number
       mode: DepthMode
     }
+  | { type: 'background-start'; requestId: number }
+  | {
+      type: 'inpaint-progress'
+      requestId: number
+      loaded: number
+      total: number
+      progress: number
+    }
+  | {
+      type: 'background'
+      requestId: number
+      buffer: ArrayBuffer
+      width: number
+      height: number
+    }
+  | { type: 'background-error'; requestId: number; message: string }
   | { type: 'error'; requestId: number; message: string }
 
 export interface DepthClient {

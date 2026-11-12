@@ -32,6 +32,16 @@ const FILES = [
     url: 'https://raw.githubusercontent.com/DepthAnything/Depth-Anything-V2/main/LICENSE',
     dest: `${OUT_DIR}/LICENSE`,
   },
+  {
+    url: 'https://huggingface.co/opencv/inpainting_lama/resolve/aee6d22f0a13e5e35af1c9a1c3afd62841fc6f3f/inpainting_lama_2025jan.onnx',
+    dest: 'public/models/lama/inpainting_lama_2025jan.onnx',
+    bytes: 92_591_623,
+    sha256: '7df918ac3921d3daf0aae1d219776cf0dc4e4935f035af81841b40adcf74fdf2',
+  },
+  {
+    url: 'https://raw.githubusercontent.com/opencv/opencv_zoo/main/LICENSE',
+    dest: 'public/models/lama/LICENSE',
+  },
 ]
 
 async function sha256(file) {

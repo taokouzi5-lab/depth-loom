@@ -75,6 +75,69 @@ describe('useDepthEstimation', () => {
     expect(Array.from(result.current.depth?.data ?? [])).toEqual([0, 1, 0.5, 1])
   })
 
+  it('tracks the inpainted background and its progress', async () => {
+    const image = makeImage()
+    const { result } = renderHook(() => useDepthEstimation(image, createClient))
+    await waitFor(() => expect(client.estimate).toHaveBeenCalledTimes(1))
+    const requestId = client.estimate.mock.calls[0][1] as number
+
+    act(() => {
+      onMessage({ type: 'background-start', requestId })
+    })
+    expect(result.current.backgroundStatus).toBe('loading')
+    expect(result.current.background).toBeNull()
+
+    act(() => {
+      onMessage({
+        type: 'inpaint-progress',
+        requestId,
+        loaded: 40,
+        total: 100,
+        progress: 40,
+      })
+    })
+    expect(result.current.backgroundProgress?.progress).toBe(40)
+
+    const buffer = new Uint8ClampedArray([1, 2, 3, 255]).buffer
+    act(() => {
+      onMessage({
+        type: 'background',
+        requestId,
+        buffer,
+        width: 1,
+        height: 1,
+      })
+    })
+    expect(result.current.backgroundStatus).toBe('ready')
+    expect(result.current.background).toMatchObject({ width: 1, height: 1 })
+    expect(result.current.backgroundProgress).toBeNull()
+
+    act(() => {
+      onMessage({ type: 'background-error', requestId, message: 'no model' })
+    })
+    expect(result.current.backgroundStatus).toBe('error')
+  })
+
+  it('ignores stale background results', async () => {
+    const image = makeImage()
+    const { result } = renderHook(() => useDepthEstimation(image, createClient))
+    await waitFor(() => expect(client.estimate).toHaveBeenCalledTimes(1))
+    const requestId = client.estimate.mock.calls[0][1] as number
+
+    act(() => {
+      onMessage({
+        type: 'background',
+        requestId: requestId + 1,
+        buffer: new Uint8ClampedArray([0, 0, 0, 255]).buffer,
+        width: 1,
+        height: 1,
+      })
+    })
+
+    expect(result.current.backgroundStatus).toBe('idle')
+    expect(result.current.background).toBeNull()
+  })
+
   it('ignores stale request results', async () => {
     const image = makeImage()
     const { result } = renderHook(() => useDepthEstimation(image, createClient))

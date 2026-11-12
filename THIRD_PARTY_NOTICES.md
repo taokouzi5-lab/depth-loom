@@ -28,6 +28,13 @@ only renames the local directory to keep the loader path stable.
 - Source: https://github.com/facebookresearch/dinov2
 - License: Apache-2.0
 
+## LaMa inpainting model
+
+- Work: LaMa — Resolution-robust Large Mask Inpainting with Fourier Convolutions
+- Authors: Samsung Research; ONNX export by OpenCV Zoo
+- Source: https://huggingface.co/opencv/inpainting_lama
+- License: Apache-2.0
+
 ## Transformers.js
 
 - Package: `@huggingface/transformers`
