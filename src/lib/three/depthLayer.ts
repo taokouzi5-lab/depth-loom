@@ -6,6 +6,7 @@ import {
   type PlaneGeometry,
 } from 'three'
 import type { DepthMap } from '../depth/protocol'
+import { YAW_LIMIT } from './orbit'
 import {
   computeLayerThreshold,
   createBackgroundCanvas,
@@ -19,6 +20,8 @@ import {
 
 export type StageView = 'original' | '3d'
 
+// The foreground matte must extend past the occluded-side fill, otherwise the
+// inpainted plate shows through the feathered edge as a halo at rest.
 const MASK_DILATION = 3
 const BACKGROUND_TINT = 0xffffff
 
@@ -41,6 +44,7 @@ export class DepthLayer {
   private depth: DepthMap | null = null
   private view: StageView = 'original'
   private strength = 1
+  private orbitYaw = 0
 
   constructor(
     mesh: Mesh,
@@ -93,6 +97,11 @@ export class DepthLayer {
     this.apply()
   }
 
+  setOrbit(yaw: number): void {
+    this.orbitYaw = yaw
+    this.updateLayerPositions()
+  }
+
   dispose(): void {
     this.clearLayers()
     this.aiBackgroundCanvas = null
@@ -139,6 +148,8 @@ export class DepthLayer {
     const foregroundMaterial = new MeshBasicMaterial({
       map: this.foregroundTexture,
       transparent: true,
+      depthTest: false,
+      depthWrite: false,
       toneMapped: false,
     })
     this.layerMaterials.push(backgroundMaterial, foregroundMaterial)
@@ -151,7 +162,11 @@ export class DepthLayer {
   }
 
   private updateLayerPositions(): void {
-    const separation = LAYER_SEPARATION * this.strength
+    // Keep both cards coplanar at rest: a permanent z offset makes the near
+    // card project slightly larger and exposes the inpainted plate as a halo
+    // before the user has even rotated. Separate them only while orbiting.
+    const orbitRatio = Math.min(1, Math.abs(this.orbitYaw) / YAW_LIMIT)
+    const separation = LAYER_SEPARATION * this.strength * orbitRatio
     if (this.backgroundMesh) this.backgroundMesh.position.z = -separation
     if (this.foregroundMesh) this.foregroundMesh.position.z = separation
   }

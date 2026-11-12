@@ -117,6 +117,7 @@ class ImageStageController implements ImageStage {
         this.group.rotation.x = pitch
         this.camera.position.z = this.baseDistance / zoom
         this.camera.lookAt(0, 0, 0)
+        this.depthLayer.setOrbit(yaw)
       },
       requestRender: () => this.requestRender(),
     })
@@ -309,6 +310,7 @@ class ImageStageController implements ImageStage {
     this.group.rotation.x = this.pitch
     this.camera.position.z = this.baseDistance / this.zoom
     this.camera.lookAt(0, 0, 0)
+    this.depthLayer.setOrbit(this.yaw)
     this.renderer.render(this.scene, this.camera)
 
     const settled =

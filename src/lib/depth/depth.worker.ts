@@ -3,6 +3,7 @@ import * as ort from 'onnxruntime-web/all'
 import { buildForegroundMask, computeDepthThreshold } from './mask'
 import { normalizeDepth } from './normalize'
 import { downloadProgress } from './progress'
+import { refineDepthWithColor } from './refine'
 import type {
   DepthEstimateRequest,
   DepthMap,
@@ -42,7 +43,7 @@ let queue = Promise.resolve()
 
 const INPAINT_MODEL = 'lama/inpainting_lama_2025jan.onnx'
 const INPAINT_SIZE = 512
-const INPAINT_DILATION = 3
+const INPAINT_DILATION = 1
 
 function post(message: DepthWorkerResponse, transfer?: Transferable[]): void {
   scope.postMessage(message, transfer)
@@ -477,8 +478,16 @@ async function handleEstimate(request: DepthEstimateRequest): Promise<void> {
     const height = dims[dims.length - 2] ?? request.height
     const width = dims[dims.length - 1] ?? request.width
     const normalized = normalizeDepth(predicted.data)
-    const backgroundDepth = normalized.slice()
-    const buffer = normalized.buffer as ArrayBuffer
+    const refined = refineDepthWithColor(
+      normalized,
+      width,
+      height,
+      new Uint8ClampedArray(request.buffer),
+      request.width,
+      request.height,
+    )
+    const backgroundDepth = refined.slice()
+    const buffer = refined.buffer as ArrayBuffer
 
     post(
       {
