@@ -2,6 +2,7 @@
 import * as ort from 'onnxruntime-web/all'
 import { buildForegroundMask, computeDepthThreshold } from './mask'
 import { normalizeDepth } from './normalize'
+import { downloadProgress } from './progress'
 import type {
   DepthEstimateRequest,
   DepthMap,
@@ -193,7 +194,7 @@ async function fetchModelBuffer(
       requestId,
       loaded,
       total,
-      progress: total > 0 ? (loaded / total) * 100 : 0,
+      progress: downloadProgress(loaded, total),
     })
   }
 

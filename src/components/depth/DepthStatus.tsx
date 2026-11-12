@@ -62,7 +62,7 @@ export function DepthStatus({
           <span className="dl-depth-status__detail">
             {t.depth.inpainting}
             {backgroundProgress
-              ? ` ${Math.round(backgroundProgress.progress)}%`
+              ? ` ${Math.min(100, Math.max(0, Math.round(backgroundProgress.progress)))}%`
               : ''}
           </span>
         )}
@@ -70,7 +70,9 @@ export function DepthStatus({
     )
   }
 
-  const percent = progress ? Math.round(progress.progress) : null
+  const percent = progress
+    ? Math.min(100, Math.max(0, Math.round(progress.progress)))
+    : null
   const title =
     status === 'loading' ? t.depth.loadingTitle : t.depth.estimatingTitle
 
