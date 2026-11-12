@@ -2,7 +2,7 @@ import { LinearFilter, PlaneGeometry, SRGBColorSpace, CanvasTexture } from 'thre
 import type { DepthMap } from '../depth/protocol'
 
 /** Foreground/background separation in world units at strength 1. */
-export const LAYER_SEPARATION = 0.05
+export const LAYER_SEPARATION = 0.035
 
 /** Below this depth range the image is effectively flat; layers add nothing. */
 export const MIN_DEPTH_RANGE = 0.03
