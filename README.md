@@ -146,11 +146,13 @@ These are averages from a local preview server, not a benchmark: transfer time i
 negligible because the weights are local. CI runners have no GPU, so the E2E
 suite always exercises the CPU fallback; the WebGPU row is a local measurement.
 
-The LaMa fill runs after depth, on the CPU (WASM). On this machine the first run
+The LaMa fill runs after depth, on the CPU (WASM). On this machine a local run
 took about **37 s end to end** from page load through depth, the 92.6 MB model
-download, and session initialization; the session stays in the worker, so later
-images skip the download and model init. The fill is composited only inside the
-foreground mask; the rest of the plate is the untouched photo.
+download, and session initialization; the first run against the public GitHub
+Pages deployment took **~147 s** in this network environment. The session stays
+in the worker, so later images skip the download and model init. The fill is
+composited only inside the foreground mask; the rest of the plate is the
+untouched photo.
 
 - Test suite: 116 unit/component tests and 14 E2E tests (desktop Chromium, 375px
   Chromium with the real-model depth/export flow, and a 375px WebKit subset).
