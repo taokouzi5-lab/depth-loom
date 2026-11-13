@@ -64,6 +64,36 @@ describe('applyDepthDisplacement', () => {
     geometry.dispose()
   })
 
+  it('supports a custom scale and pins the plane border', () => {
+    const flatDepth: DepthMap = {
+      width: 2,
+      height: 2,
+      data: new Float32Array([1, 1, 1, 1]),
+    }
+    const geometry = new PlaneGeometry(1, 1, 4, 4)
+    applyDepthDisplacement(geometry, flatDepth, 1, {
+      scale: 0.1,
+      edgeFalloff: 0.25,
+    })
+
+    const position = geometry.getAttribute('position')
+    const uv = geometry.getAttribute('uv')
+    let centerMax = 0
+    for (let index = 0; index < position.count; index += 1) {
+      const u = uv.getX(index)
+      const v = uv.getY(index)
+      const z = position.getZ(index)
+      if (u === 0 || u === 1 || v === 0 || v === 1) {
+        expect(z).toBeCloseTo(0, 6)
+      } else if (u === 0.5 && v === 0.5) {
+        centerMax = Math.abs(z)
+      }
+    }
+    expect(centerMax).toBeLessThanOrEqual(0.05 + 1e-6)
+    expect(centerMax).toBeGreaterThan(0)
+    geometry.dispose()
+  })
+
   it('clears a displaced plane', () => {
     const geometry = new PlaneGeometry(1, 1, 1, 1)
     applyDepthDisplacement(geometry, depth, 1)

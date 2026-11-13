@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPushPullFill } from './fill'
+import { createPushPullFill, fillDepthWithBackground } from './fill'
 
 function makeImage(
   pixels: Array<[number, number, number]>,
@@ -79,6 +79,30 @@ describe('createPushPullFill', () => {
     const source = makeImage([[10, 20, 30]], 1, 1)
 
     expect(createPushPullFill(source, new Uint8Array([0]), 1)).toBeNull()
+  })
+
+  it('fills the depth under the foreground with background depth', () => {
+    const depth = {
+      data: new Float32Array([0.2, 0.8]),
+      width: 2,
+      height: 1,
+    }
+
+    const filled = fillDepthWithBackground(depth, new Uint8Array([255, 0]), 2)
+
+    expect(filled).not.toBeNull()
+    expect(filled![0]).toBeCloseTo(0.2, 2)
+    expect(filled![1]).toBeCloseTo(0.2, 2)
+  })
+
+  it('returns null when there is no background depth to sample', () => {
+    const depth = {
+      data: new Float32Array([0.5]),
+      width: 1,
+      height: 1,
+    }
+
+    expect(fillDepthWithBackground(depth, new Uint8Array([0]))).toBeNull()
   })
 
   it('downsamples to maxWidth while filling', () => {

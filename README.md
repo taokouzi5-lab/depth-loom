@@ -29,10 +29,12 @@ photo as a subtly displaced mesh. Nothing is uploaded; there is no backend.
   the foreground, runs a self-hosted 92.6 MB LaMa ONNX model at 512px, and
   composites the generated pixels behind the cutout. The session is cached; if
   the model fails, the classical fill is used.
-- **3D view**: the normalized depth field drives CPU vertex displacement on the
-  257×257 plane; a custom fragment shader derives relief normals from the depth
-  texture and adds depth-based fog. The 5% edge bleed and ±25°/±15° orbit limits
-  keep disocclusion out of the MVP.
+- **3D view**: a foreground cutout card over a background plate. Both stay
+  coplanar at rest; the plate is a subdivided mesh displaced by the depth field,
+  with the foreground depth replaced by the surrounding background depth and
+  the outer border pinned, so the photo gains real relief without bending its
+  frame. Separation ramps in only while orbiting (±25° yaw / ±15° pitch), which
+  keeps the scene reading as one photo instead of two stacked cards.
 - **Depth strength slider (0–2×)**: real-time, applied on input without a
   per-frame geometry rebuild. The first successful depth result auto-switches to
   3D; original and depth views remain one click away.
@@ -109,7 +111,7 @@ See [docs/architecture.md](docs/architecture.md) for the data flow.
 Bundle (production build):
 
 - Initial JS: **78.8 KB gzip**, CSS 5.1 KB.
-- Lazy Three.js stage: **136.4 KB gzip**.
+- Lazy Three.js stage: **136.9 KB gzip**.
 - Depth worker chunk: 1.29 MB uncompressed, loaded only after an image is ready.
 - Self-hosted weights: **139.0 MB** total — Depth Anything V2 Small 46.4 MB
   (q4f16 19.1 MB for WebGPU, q8 27.3 MB for WASM) plus the 92.6 MB LaMa
@@ -154,9 +156,9 @@ in the worker, so later images skip the download and model init. The fill is
 composited only inside the foreground mask; the rest of the plate is the
 untouched photo.
 
-- Test suite: 130 unit/component tests and 14 E2E tests (desktop Chromium, 375px
+- Test suite: 133 unit/component tests and 14 E2E tests (desktop Chromium, 375px
   Chromium with the real-model depth/export flow, and a 375px WebKit subset).
-- Coverage: 94.9% statements / 86.3% branches over `src/lib` and `src/hooks`.
+- Coverage: 95.1% statements / 86.8% branches over `src/lib` and `src/hooks`.
   WebGL, worker, and download glue are excluded from the coverage denominator and
   exercised by the E2E suite instead.
 

@@ -49,13 +49,13 @@ let queue = Promise.resolve()
 const INPAINT_MODEL = 'lama/inpainting_lama_2025jan.onnx'
 const INPAINT_SIZE = 512
 const INPAINT_DILATION = 1
-// At the maximum yaw the foreground card moves by roughly 25 image px, so the
-// plate needs a background-coloured band at least that wide behind the
-// silhouette. Generated pixels start this far inside the mask; the exposed
-// band is filled from surrounding background colours instead of the object's
-// own edge pixels (which would read as a dark echo) or AI texture (which is
-// unreliable when the hole is large).
-const INPAINT_EDGE_GUARD = 24
+// At the maximum yaw the foreground card moves by ~12 image px with the
+// current layer separation, so the plate needs a background-coloured band at
+// least that wide behind the silhouette. Generated pixels start this far
+// inside the mask; the exposed band is filled from surrounding background
+// colours instead of the object's own edge pixels (which would read as a dark
+// echo) or AI texture (which is unreliable when the hole is large).
+const INPAINT_EDGE_GUARD = 16
 
 function post(message: DepthWorkerResponse, transfer?: Transferable[]): void {
   scope.postMessage(message, transfer)

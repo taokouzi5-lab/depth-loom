@@ -31,6 +31,17 @@ export function sampleDepth(depth: DepthMap, u: number, v: number): number {
   return top * (1 - fy) + bottom * fy
 }
 
+type DisplacementOptions = {
+  /** World-space z at depth 0 or 1, before strength. */
+  scale?: number
+  /**
+   * Fraction of the plane's edge over which the displacement fades to zero.
+   * Pinning the border keeps the photo frame rectangular; without it the whole
+   * plane bends and the image looks melted.
+   */
+  edgeFalloff?: number
+}
+
 /**
  * Displace the plane's z positions once per image/strength change. The depth
  * map is top-down; PlaneGeometry's v=1 edge is the top of the image.
@@ -39,17 +50,29 @@ export function applyDepthDisplacement(
   geometry: BufferGeometry,
   depth: DepthMap,
   strength: number,
+  options: DisplacementOptions = {},
 ): void {
   const position = geometry.getAttribute('position')
   const uv = geometry.getAttribute('uv')
   if (!position || !uv) return
 
   const count = Math.min(position.count, uv.count)
-  const zScale = DEPTH_DISPLACEMENT_SCALE
+  const zScale = options.scale ?? DEPTH_DISPLACEMENT_SCALE
+  const edgeFalloff = options.edgeFalloff ?? 0
 
   for (let index = 0; index < count; index += 1) {
-    const d = sampleDepth(depth, uv.getX(index), 1 - uv.getY(index))
-    position.setZ(index, (d - 0.5) * strength * zScale)
+    const u = uv.getX(index)
+    const v = uv.getY(index)
+    const d = sampleDepth(depth, u, 1 - v)
+    let weight = 1
+    if (edgeFalloff > 0) {
+      const falloffU = Math.min(1, Math.min(u, 1 - u) / edgeFalloff)
+      const falloffV = Math.min(1, Math.min(v, 1 - v) / edgeFalloff)
+      weight =
+        (falloffU * falloffU * (3 - 2 * falloffU)) *
+        (falloffV * falloffV * (3 - 2 * falloffV))
+    }
+    position.setZ(index, (d - 0.5) * strength * zScale * weight)
   }
   position.needsUpdate = true
 }

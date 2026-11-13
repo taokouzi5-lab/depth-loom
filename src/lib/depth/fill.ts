@@ -202,6 +202,68 @@ function pullUp(levels: Level[], fallback: [number, number, number]): void {
 }
 
 /**
+ * Fill the depth values under a foreground mask with the surrounding
+ * background depth. The displaced background mesh must not inherit the
+ * foreground's depth, or it would bulge towards the camera where the cutout
+ * used to be.
+ */
+export function fillDepthWithBackground(
+  depth: { data: Float32Array; width: number; height: number },
+  keepMask: Uint8Array,
+  maxWidth = FILL_MAX_WIDTH,
+): Float32Array | null {
+  const { data, width, height } = depth
+  const rgba = new Uint8ClampedArray(width * height * 4)
+  for (let index = 0; index < width * height; index += 1) {
+    const value = Math.round(Math.min(1, Math.max(0, data[index])) * 255)
+    rgba[index * 4] = value
+    rgba[index * 4 + 1] = value
+    rgba[index * 4 + 2] = value
+    rgba[index * 4 + 3] = 255
+  }
+
+  const filled = createPushPullFill(
+    { data: rgba, width, height },
+    keepMask,
+    maxWidth,
+  )
+  if (!filled) return null
+
+  const output = new Float32Array(width * height)
+  for (let y = 0; y < height; y += 1) {
+    const sourceY = Math.min(
+      Math.max(((y + 0.5) / height) * filled.height - 0.5, 0),
+      filled.height - 1,
+    )
+    const y0 = Math.floor(sourceY)
+    const y1 = Math.min(filled.height - 1, y0 + 1)
+    const fy = sourceY - y0
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x
+      if (keepMask[index] >= 128) {
+        output[index] = data[index]
+        continue
+      }
+      const sourceX = Math.min(
+        Math.max(((x + 0.5) / width) * filled.width - 0.5, 0),
+        filled.width - 1,
+      )
+      const x0 = Math.floor(sourceX)
+      const x1 = Math.min(filled.width - 1, x0 + 1)
+      const fx = sourceX - x0
+      const top =
+        filled.data[(y0 * filled.width + x0) * 4] * (1 - fx) +
+        filled.data[(y0 * filled.width + x1) * 4] * fx
+      const bottom =
+        filled.data[(y1 * filled.width + x0) * 4] * (1 - fx) +
+        filled.data[(y1 * filled.width + x1) * 4] * fx
+      output[index] = (top * (1 - fy) + bottom * fy) / 255
+    }
+  }
+  return output
+}
+
+/**
  * Fill every pixel where `keepMask` is below 128 using only colours from
  * pixels above it. Downloaded to at most `maxWidth` for speed; the caller
  * scales the result back up. Returns null when the image has no background

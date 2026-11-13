@@ -52,12 +52,14 @@ RGBA `ArrayBuffer` after LaMa finishes.
 
 The background plate keeps the original photo wherever the foreground matte is
 not fully opaque. Generated pixels are composited only inside the Otsu mask
-eroded by a guard band, and the 8% foreground frame is excluded from the fill.
-At rest the two cards are coplanar, so the view is pixel-identical to the source
-photo and no fill can show through the feather as a halo; only when the cards
-separate does the generated content become visible. Before LaMa arrives (or if
-it fails), the fallback uses a masked push-pull pyramid rather than a 64px blur,
-so it does not leave a soft white band behind the cutout.
+eroded by a guard band. The plate is a subdivided mesh displaced by a
+background depth map: foreground depth is replaced by the surrounding
+background depth (a masked push-pull pass) and the outer border is pinned, so
+the photo gains relief without bending its frame. At rest the two layers are
+coplanar, so the view is identical to the source photo and no fill can show
+through the feather as a halo; separation ramps in only with orbit. Before LaMa
+arrives (or if it fails), the fallback uses a masked push-pull pyramid rather
+than a 64px blur, so it does not leave a soft white band behind the cutout.
 
 Model files live in `public/models/depth-anything-v2-small/` and
 `public/models/lama/`, and are committed. ONNX Runtime WASM binaries are copied
@@ -95,7 +97,7 @@ chunk (M2) is loaded only when an image is ready.
 - Inference: target < 5 s WebGPU, < 15 s WASM on a mid-range laptop
 - Render on demand: no `requestAnimationFrame` loop while idle
 
-Measured build: initial JS 78.8 KB gzip, CSS 5.1 KB, lazy stage 136.4 KB gzip,
+Measured build: initial JS 78.8 KB gzip, CSS 5.1 KB, lazy stage 136.9 KB gzip,
 depth worker 1.29 MB uncompressed.
 
 Measured depth pipeline on the same machine (i7-12700H, 15.8 GB RAM), local

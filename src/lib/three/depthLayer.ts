@@ -7,13 +7,14 @@ import {
   type Texture,
 } from 'three'
 import type { DepthMap } from '../depth/protocol'
+import { applyDepthDisplacement } from './displacement'
+import { createImagePlaneGeometry } from './geometry'
 import { YAW_LIMIT } from './orbit'
 import {
   computeLayerThreshold,
   createBackgroundCanvas,
-  createFillMaskCanvas,
+  createBackgroundDepth,
   createForegroundTexture,
-  createLayerGeometry,
   createLayerTexture,
   createMaskCanvas,
   dilateMaskCanvas,
@@ -35,7 +36,9 @@ export class DepthLayer {
   private readonly requestRender: () => void
 
   private readonly layerGroup = new Group()
-  private layerGeometry: PlaneGeometry | null = null
+  private backgroundGeometry: PlaneGeometry | null = null
+  private foregroundGeometry: PlaneGeometry | null = null
+  private backgroundDepth: DepthMap | null = null
   private backgroundTexture: CanvasTexture | null = null
   private foregroundTexture: Texture | null = null
   private readonly layerMaterials: MeshBasicMaterial[] = []
@@ -95,6 +98,7 @@ export class DepthLayer {
     const next = Math.min(2, Math.max(0, strength))
     if (this.strength === next) return
     this.strength = next
+    this.displaceLayers()
     this.updateLayerPositions()
     this.apply()
   }
@@ -121,8 +125,7 @@ export class DepthLayer {
     if (threshold === null) return
 
     const mask = createMaskCanvas(this.depth, threshold)
-    const fillMask = createFillMaskCanvas(this.depth, threshold)
-    if (!mask || !fillMask) return
+    if (!mask) return
 
     const expandedMask = dilateMaskCanvas(mask, MASK_DILATION) ?? mask
     const foregroundTexture = createForegroundTexture(
@@ -131,16 +134,18 @@ export class DepthLayer {
     )
     if (!foregroundTexture) return
 
-    // Fill only up to the Otsu edge, not the dilated matte, and never the
-    // outer frame: the frame is foreground-card-only, so filling it would
-    // expose a blurry vertical band when the cards separate.
+    // Fill only up to the Otsu edge, not the dilated matte: the extra ring is
+    // under the feathered foreground at rest, and fill there would show
+    // through as a halo before any AI result arrives.
     const backgroundCanvas =
       this.aiBackgroundCanvas ??
-      createBackgroundCanvas(this.sourceCanvas, fillMask)
-    const geometry = createLayerGeometry(
-      this.sourceCanvas.width / this.sourceCanvas.height,
-    )
-    this.layerGeometry = geometry
+      createBackgroundCanvas(this.sourceCanvas, mask)
+    const aspect = this.sourceCanvas.width / this.sourceCanvas.height
+    this.backgroundGeometry = createImagePlaneGeometry(aspect)
+    this.foregroundGeometry = createImagePlaneGeometry(aspect)
+    this.backgroundDepth =
+      createBackgroundDepth(this.depth, mask) ?? this.depth
+    this.displaceLayers()
     this.backgroundTexture = backgroundCanvas
       ? createLayerTexture(backgroundCanvas)
       : null
@@ -160,11 +165,25 @@ export class DepthLayer {
     })
     this.layerMaterials.push(backgroundMaterial, foregroundMaterial)
 
-    this.backgroundMesh = new Mesh(geometry, backgroundMaterial)
-    this.foregroundMesh = new Mesh(geometry, foregroundMaterial)
+    this.backgroundMesh = new Mesh(this.backgroundGeometry, backgroundMaterial)
+    this.foregroundMesh = new Mesh(this.foregroundGeometry, foregroundMaterial)
     this.layerGroup.add(this.backgroundMesh, this.foregroundMesh)
 
     this.updateLayerPositions()
+  }
+
+  private displaceLayers(): void {
+    // Only the plate is displaced. The foreground cutout stays a flat card so
+    // its silhouette keeps the photo's exact shape; the plate gets the relief,
+    // with its outer border pinned so the frame does not bend like rubber.
+    if (this.backgroundGeometry && this.backgroundDepth) {
+      applyDepthDisplacement(
+        this.backgroundGeometry,
+        this.backgroundDepth,
+        this.strength,
+        { scale: 0.1, edgeFalloff: 0.12 },
+      )
+    }
   }
 
   private updateLayerPositions(): void {
@@ -191,8 +210,11 @@ export class DepthLayer {
     this.backgroundTexture = null
     this.foregroundTexture?.dispose()
     this.foregroundTexture = null
-    this.layerGeometry?.dispose()
-    this.layerGeometry = null
+    this.backgroundGeometry?.dispose()
+    this.backgroundGeometry = null
+    this.foregroundGeometry?.dispose()
+    this.foregroundGeometry = null
+    this.backgroundDepth = null
     this.backgroundMesh = null
     this.foregroundMesh = null
     this.layerGroup.clear()

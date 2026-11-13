@@ -2,21 +2,24 @@ import {
   CanvasTexture,
   DataTexture,
   LinearFilter,
-  PlaneGeometry,
   RGBAFormat,
   SRGBColorSpace,
   UnsignedByteType,
 } from 'three'
 import { computeDepthThreshold } from '../depth/mask'
 import type { DepthMap } from '../depth/protocol'
-import { createPushPullFill, FILL_MAX_WIDTH } from '../depth/fill'
+import {
+  createPushPullFill,
+  FILL_MAX_WIDTH,
+  fillDepthWithBackground,
+} from '../depth/fill'
 
-/** Foreground/background separation in world units at strength 1. */
-export const LAYER_SEPARATION = 0.035
-
-/** Keep the outer frame on the foreground card so the far card never shows a
- * gap at the image edge when the group rotates. */
-const BORDER_FRAME = 0.08
+/**
+ * Foreground/background separation in world units at strength 1. Deliberately
+ * small: a larger offset exposes more of the generated plate and makes the
+ * scene read as two pasted photos rather than one scene with parallax.
+ */
+export const LAYER_SEPARATION = 0.022
 
 /** Otsu split shared with the inpainting mask. Null when the image is flat. */
 export function computeLayerThreshold(depth: DepthMap): number | null {
@@ -26,10 +29,15 @@ export function computeLayerThreshold(depth: DepthMap): number | null {
   return computeDepthThreshold(depth.data)
 }
 
-function buildMaskCanvas(
+/**
+ * White-with-alpha mask at depth-map resolution. Alpha 255 = foreground.
+ * No artificial border: a frame would travel with the foreground card and its
+ * inner edge would show as a rectangular seam (a duplicated strip of the
+ * photo) whenever the cards separate.
+ */
+export function createMaskCanvas(
   depth: DepthMap,
   threshold: number,
-  includeFrame: boolean,
 ): HTMLCanvasElement | null {
   const canvas = document.createElement('canvas')
   canvas.width = depth.width
@@ -37,48 +45,16 @@ function buildMaskCanvas(
   const context = canvas.getContext('2d')
   if (!context) return null
 
-  const frameX = Math.max(1, Math.round(depth.width * BORDER_FRAME))
-  const frameY = Math.max(1, Math.round(depth.height * BORDER_FRAME))
   const image = context.createImageData(depth.width, depth.height)
   for (let index = 0; index < depth.data.length; index += 1) {
-    const x = index % depth.width
-    const y = Math.floor(index / depth.width)
-    const inFrame =
-      includeFrame &&
-      (x < frameX ||
-        x >= depth.width - frameX ||
-        y < frameY ||
-        y >= depth.height - frameY)
     const offset = index * 4
     image.data[offset] = 255
     image.data[offset + 1] = 255
     image.data[offset + 2] = 255
-    image.data[offset + 3] =
-      inFrame || depth.data[index] > threshold ? 255 : 0
+    image.data[offset + 3] = depth.data[index] > threshold ? 255 : 0
   }
   context.putImageData(image, 0, 0)
   return canvas
-}
-
-/** White-with-alpha mask at depth-map resolution. Alpha 255 = foreground. */
-export function createMaskCanvas(
-  depth: DepthMap,
-  threshold: number,
-): HTMLCanvasElement | null {
-  return buildMaskCanvas(depth, threshold, true)
-}
-
-/**
- * Mask for inpainting/background fill. Unlike the foreground matte it must not
- * include the outer frame: the frame only keeps the foreground card covering
- * the image edge, and filling it would expose blurry plate content as a band
- * when the cards separate.
- */
-export function createFillMaskCanvas(
-  depth: DepthMap,
-  threshold: number,
-): HTMLCanvasElement | null {
-  return buildMaskCanvas(depth, threshold, false)
 }
 
 /**
@@ -284,7 +260,25 @@ export function createLayerTexture(canvas: HTMLCanvasElement): CanvasTexture {
   return texture
 }
 
-/** Flat card geometry; 5% bleed matches the single-mesh framing. */
-export function createLayerGeometry(imageAspect: number): PlaneGeometry {
-  return new PlaneGeometry(imageAspect * 1.05, 1.05, 1, 1)
+/**
+ * Depth for the displaced background mesh. Foreground depth values would make
+ * the plate bulge towards the camera exactly where the cutout is; replacing
+ * them with the surrounding background depth keeps the relief behind the
+ * foreground instead of on top of it.
+ */
+export function createBackgroundDepth(
+  depth: DepthMap,
+  mask: HTMLCanvasElement,
+): DepthMap | null {
+  const context = mask.getContext('2d')
+  if (!context) return null
+  const image = context.getImageData(0, 0, depth.width, depth.height)
+  const keepMask = new Uint8Array(depth.width * depth.height)
+  for (let index = 0; index < keepMask.length; index += 1) {
+    keepMask[index] = image.data[index * 4 + 3]
+  }
+
+  const data = fillDepthWithBackground(depth, keepMask)
+  if (!data) return null
+  return { data, width: depth.width, height: depth.height }
 }
