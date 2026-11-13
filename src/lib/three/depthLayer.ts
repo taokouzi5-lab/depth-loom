@@ -10,6 +10,7 @@ import { YAW_LIMIT } from './orbit'
 import {
   computeLayerThreshold,
   createBackgroundCanvas,
+  createFillMaskCanvas,
   createForegroundCanvas,
   createLayerGeometry,
   createLayerTexture,
@@ -119,7 +120,8 @@ export class DepthLayer {
     if (threshold === null) return
 
     const mask = createMaskCanvas(this.depth, threshold)
-    if (!mask) return
+    const fillMask = createFillMaskCanvas(this.depth, threshold)
+    if (!mask || !fillMask) return
 
     const expandedMask = dilateMaskCanvas(mask, MASK_DILATION) ?? mask
     const foregroundCanvas = createForegroundCanvas(
@@ -128,9 +130,12 @@ export class DepthLayer {
     )
     if (!foregroundCanvas) return
 
+    // Fill only up to the Otsu edge, not the dilated matte, and never the
+    // outer frame: the frame is foreground-card-only, so filling it would
+    // expose a blurry vertical band when the cards separate.
     const backgroundCanvas =
       this.aiBackgroundCanvas ??
-      createBackgroundCanvas(this.sourceCanvas, expandedMask)
+      createBackgroundCanvas(this.sourceCanvas, fillMask)
     const geometry = createLayerGeometry(
       this.sourceCanvas.width / this.sourceCanvas.height,
     )

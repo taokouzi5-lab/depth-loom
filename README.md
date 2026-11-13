@@ -108,8 +108,8 @@ See [docs/architecture.md](docs/architecture.md) for the data flow.
 
 Bundle (production build):
 
-- Initial JS: **78.5 KB gzip**, CSS 5.1 KB.
-- Lazy Three.js stage: **134.7 KB gzip**.
+- Initial JS: **78.8 KB gzip**, CSS 5.1 KB.
+- Lazy Three.js stage: **136.3 KB gzip**.
 - Depth worker chunk: 1.29 MB uncompressed, loaded only after an image is ready.
 - Self-hosted weights: **139.0 MB** total — Depth Anything V2 Small 46.4 MB
   (q4f16 19.1 MB for WebGPU, q8 27.3 MB for WASM) plus the 92.6 MB LaMa
@@ -154,9 +154,9 @@ in the worker, so later images skip the download and model init. The fill is
 composited only inside the foreground mask; the rest of the plate is the
 untouched photo.
 
-- Test suite: 122 unit/component tests and 14 E2E tests (desktop Chromium, 375px
+- Test suite: 130 unit/component tests and 14 E2E tests (desktop Chromium, 375px
   Chromium with the real-model depth/export flow, and a 375px WebKit subset).
-- Coverage: 94.2% statements / 85.0% branches over `src/lib` and `src/hooks`.
+- Coverage: 94.9% statements / 86.3% branches over `src/lib` and `src/hooks`.
   WebGL, worker, and download glue are excluded from the coverage denominator and
   exercised by the E2E suite instead.
 

@@ -1,6 +1,7 @@
 import { LinearFilter, PlaneGeometry, SRGBColorSpace, CanvasTexture } from 'three'
 import { computeDepthThreshold } from '../depth/mask'
 import type { DepthMap } from '../depth/protocol'
+import { createPushPullFill, FILL_MAX_WIDTH } from './fill'
 
 /** Foreground/background separation in world units at strength 1. */
 export const LAYER_SEPARATION = 0.035
@@ -17,10 +18,10 @@ export function computeLayerThreshold(depth: DepthMap): number | null {
   return computeDepthThreshold(depth.data)
 }
 
-/** White-with-alpha mask at depth-map resolution. Alpha 255 = foreground. */
-export function createMaskCanvas(
+function buildMaskCanvas(
   depth: DepthMap,
   threshold: number,
+  includeFrame: boolean,
 ): HTMLCanvasElement | null {
   const canvas = document.createElement('canvas')
   canvas.width = depth.width
@@ -35,10 +36,11 @@ export function createMaskCanvas(
     const x = index % depth.width
     const y = Math.floor(index / depth.width)
     const inFrame =
-      x < frameX ||
-      x >= depth.width - frameX ||
-      y < frameY ||
-      y >= depth.height - frameY
+      includeFrame &&
+      (x < frameX ||
+        x >= depth.width - frameX ||
+        y < frameY ||
+        y >= depth.height - frameY)
     const offset = index * 4
     image.data[offset] = 255
     image.data[offset + 1] = 255
@@ -48,6 +50,27 @@ export function createMaskCanvas(
   }
   context.putImageData(image, 0, 0)
   return canvas
+}
+
+/** White-with-alpha mask at depth-map resolution. Alpha 255 = foreground. */
+export function createMaskCanvas(
+  depth: DepthMap,
+  threshold: number,
+): HTMLCanvasElement | null {
+  return buildMaskCanvas(depth, threshold, true)
+}
+
+/**
+ * Mask for inpainting/background fill. Unlike the foreground matte it must not
+ * include the outer frame: the frame only keeps the foreground card covering
+ * the image edge, and filling it would expose blurry plate content as a band
+ * when the cards separate.
+ */
+export function createFillMaskCanvas(
+  depth: DepthMap,
+  threshold: number,
+): HTMLCanvasElement | null {
+  return buildMaskCanvas(depth, threshold, false)
 }
 
 /**
@@ -116,109 +139,63 @@ export function createInverseMaskCanvas(
   return canvas
 }
 
-const FILL_LEVEL_WIDTH = 64
-const FILL_ITERATIONS = 64
-
 /**
- * Fill the masked (foreground) region at low resolution by averaging
- * neighbouring background pixels. Unlike a Gaussian blur, this never mixes
- * foreground colours into the plate, so a moved card does not leave a halo of
- * the object it uncovered.
+ * Fill the masked (foreground) region from surrounding background colours with
+ * a masked pyramid. The pyramid keeps local detail that a 64px averaging pass
+ * loses, so a moved card does not uncover a soft white band.
  */
-function fillHoles(image: ImageData, maskAlpha: Uint8ClampedArray): void {
-  const { width, height, data } = image
-  const total = width * height
-  const valid = new Uint8Array(total)
-  let invalid = 0
-
-  for (let index = 0; index < total; index += 1) {
-    if (maskAlpha[index * 4 + 3] < 128) {
-      valid[index] = 1
-    } else {
-      invalid += 1
-    }
-  }
-  if (invalid === 0 || invalid === total) return
-
-  for (let iteration = 0; iteration < FILL_ITERATIONS; iteration += 1) {
-    const snapshot = valid.slice()
-    let changed = 0
-
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const index = y * width + x
-        if (valid[index]) continue
-
-        let red = 0
-        let green = 0
-        let blue = 0
-        let count = 0
-
-        for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
-          const neighbourY = y + offsetY
-          if (neighbourY < 0 || neighbourY >= height) continue
-          for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
-            const neighbourX = x + offsetX
-            if (neighbourX < 0 || neighbourX >= width) continue
-            const neighbour = neighbourY * width + neighbourX
-            if (!snapshot[neighbour]) continue
-            red += data[neighbour * 4]
-            green += data[neighbour * 4 + 1]
-            blue += data[neighbour * 4 + 2]
-            count += 1
-          }
-        }
-
-        if (count > 0) {
-          data[index * 4] = red / count
-          data[index * 4 + 1] = green / count
-          data[index * 4 + 2] = blue / count
-          valid[index] = 1
-          changed += 1
-        }
-      }
-    }
-
-    if (changed === 0) break
-  }
-}
-
 function createInpaintedFill(
   source: HTMLCanvasElement,
   foregroundMask: HTMLCanvasElement,
 ): HTMLCanvasElement | null {
-  const scale = Math.min(1, FILL_LEVEL_WIDTH / source.width)
-  const width = Math.max(1, Math.round(source.width * scale))
-  const height = Math.max(1, Math.round(source.height * scale))
+  const sourceContext = source.getContext('2d')
+  if (!sourceContext) return null
+  const sourceImage = sourceContext.getImageData(
+    0,
+    0,
+    source.width,
+    source.height,
+  )
+
+  const maskCanvas = document.createElement('canvas')
+  maskCanvas.width = source.width
+  maskCanvas.height = source.height
+  const maskContext = maskCanvas.getContext('2d')
+  if (!maskContext) return null
+  maskContext.drawImage(foregroundMask, 0, 0, source.width, source.height)
+  const maskImage = maskContext.getImageData(
+    0,
+    0,
+    source.width,
+    source.height,
+  )
+
+  const keepMask = new Uint8Array(source.width * source.height)
+  for (let index = 0; index < keepMask.length; index += 1) {
+    keepMask[index] = maskImage.data[index * 4 + 3]
+  }
+
+  const filled = createPushPullFill(sourceImage, keepMask, FILL_MAX_WIDTH)
+  if (!filled) return null
 
   const low = document.createElement('canvas')
-  low.width = width
-  low.height = height
+  low.width = filled.width
+  low.height = filled.height
   const lowContext = low.getContext('2d')
   if (!lowContext) return null
-  lowContext.drawImage(source, 0, 0, width, height)
+  const filledImage = lowContext.createImageData(filled.width, filled.height)
+  filledImage.data.set(filled.data)
+  lowContext.putImageData(filledImage, 0, 0)
 
-  const lowMask = document.createElement('canvas')
-  lowMask.width = width
-  lowMask.height = height
-  const maskContext = lowMask.getContext('2d')
-  if (!maskContext) return null
-  maskContext.drawImage(foregroundMask, 0, 0, width, height)
-
-  const image = lowContext.getImageData(0, 0, width, height)
-  const mask = maskContext.getImageData(0, 0, width, height)
-  fillHoles(image, mask.data)
-  lowContext.putImageData(image, 0, 0)
-
-  const filled = document.createElement('canvas')
-  filled.width = source.width
-  filled.height = source.height
-  const context = filled.getContext('2d')
+  const canvas = document.createElement('canvas')
+  canvas.width = source.width
+  canvas.height = source.height
+  const context = canvas.getContext('2d')
   if (!context) return null
-  context.filter = 'blur(6px)'
-  context.drawImage(low, 0, 0, filled.width, filled.height)
-  context.filter = 'none'
-  return filled
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = 'high'
+  context.drawImage(low, 0, 0, canvas.width, canvas.height)
+  return canvas
 }
 
 /**

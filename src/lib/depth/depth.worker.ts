@@ -1,6 +1,10 @@
 ﻿import { env, pipeline, RawImage } from '@huggingface/transformers'
 import * as ort from 'onnxruntime-web/all'
-import { buildForegroundMask, computeDepthThreshold } from './mask'
+import {
+  buildForegroundMask,
+  computeDepthThreshold,
+  erodeForegroundMask,
+} from './mask'
 import { normalizeDepth } from './normalize'
 import { downloadProgress } from './progress'
 import { refineDepthWithColor } from './refine'
@@ -44,6 +48,11 @@ let queue = Promise.resolve()
 const INPAINT_MODEL = 'lama/inpainting_lama_2025jan.onnx'
 const INPAINT_SIZE = 512
 const INPAINT_DILATION = 1
+// The renderer's matte is the Otsu mask dilated by 3 depth pixels and blurred,
+// so its semi-transparent band reaches ~6 px inside the silhouette. Keep
+// generated pixels out of that band: the plate under the feather must remain
+// the original photo, otherwise the two blend into a haze ring at rest.
+const INPAINT_EDGE_GUARD = 6
 
 function post(message: DepthWorkerResponse, transfer?: Transferable[]): void {
   scope.postMessage(message, transfer)
@@ -305,6 +314,12 @@ async function runInpainting(
   const lowMask = buildForegroundMask(depth, threshold, INPAINT_DILATION)
   const bounds = findForegroundBounds(lowMask, depthWidth, depthHeight)
   if (!bounds) return
+  const fillMask = erodeForegroundMask(
+    lowMask,
+    depthWidth,
+    depthHeight,
+    INPAINT_EDGE_GUARD,
+  )
 
   const session = await getInpaintSession(
     request.requestId,
@@ -415,7 +430,7 @@ async function runInpainting(
       const x1 = Math.min(size - 1, x0 + 1)
       const fx = outputX - x0
       const alphaRaw = foregroundWeightAt(
-        lowMask,
+        fillMask,
         depthWidth,
         depthHeight,
         (x + 0.5) * depthPerPixelX,

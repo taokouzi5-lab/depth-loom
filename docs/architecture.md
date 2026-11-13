@@ -50,6 +50,15 @@ the model/ORT load; subsequent images reuse both. Depth is transferred to the
 main thread as an `ArrayBuffer`; the inpainted background follows as a second
 RGBA `ArrayBuffer` after LaMa finishes.
 
+The background plate keeps the original photo wherever the foreground matte is
+not fully opaque. Generated pixels are composited only inside the Otsu mask
+eroded by a guard band, and the 8% foreground frame is excluded from the fill.
+At rest the two cards are coplanar, so the view is pixel-identical to the source
+photo and no fill can show through the feather as a halo; only when the cards
+separate does the generated content become visible. Before LaMa arrives (or if
+it fails), the fallback uses a masked push-pull pyramid rather than a 64px blur,
+so it does not leave a soft white band behind the cutout.
+
 Model files live in `public/models/depth-anything-v2-small/` and
 `public/models/lama/`, and are committed. ONNX Runtime WASM binaries are copied
 from `node_modules/onnxruntime-web/dist` into `public/ort/` by
@@ -86,7 +95,7 @@ chunk (M2) is loaded only when an image is ready.
 - Inference: target < 5 s WebGPU, < 15 s WASM on a mid-range laptop
 - Render on demand: no `requestAnimationFrame` loop while idle
 
-Measured build: initial JS 78.5 KB gzip, CSS 5.1 KB, lazy stage 134.7 KB gzip,
+Measured build: initial JS 78.8 KB gzip, CSS 5.1 KB, lazy stage 136.3 KB gzip,
 depth worker 1.29 MB uncompressed.
 
 Measured depth pipeline on the same machine (i7-12700H, 15.8 GB RAM), local

@@ -111,6 +111,45 @@ export function buildForegroundMask(
   return dilated
 }
 
+/**
+ * Shrink the fill (foreground) region by a safety radius. Composite generated
+ * pixels only where the renderer's feathered matte is fully opaque; under the
+ * feather the plate must stay the untouched photo, otherwise the blend of
+ * foreground and generated content reads as a haze ring at rest.
+ */
+export function erodeForegroundMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  radius: number,
+): Uint8Array {
+  if (radius <= 0) return mask
+
+  const eroded = new Uint8Array(mask)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (mask[y * width + x] !== 0) continue
+
+      let core = true
+      for (let offsetY = -radius; offsetY <= radius && core; offsetY += 1) {
+        const neighbourY = y + offsetY
+        if (neighbourY < 0 || neighbourY >= height) continue
+        for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
+          if (offsetX * offsetX + offsetY * offsetY > radius * radius) continue
+          const neighbourX = x + offsetX
+          if (neighbourX < 0 || neighbourX >= width) continue
+          if (mask[neighbourY * width + neighbourX] !== 0) {
+            core = false
+            break
+          }
+        }
+      }
+      if (!core) eroded[y * width + x] = 255
+    }
+  }
+  return eroded
+}
+
 /** Nearest-neighbour upscale of a depth-resolution mask to image resolution. */
 export function upsampleMask(
   mask: Uint8Array,

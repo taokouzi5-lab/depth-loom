@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildForegroundMask,
   computeDepthThreshold,
+  erodeForegroundMask,
   upsampleMask,
 } from './mask'
 import type { DepthMap } from './protocol'
@@ -41,6 +42,36 @@ describe('buildForegroundMask', () => {
     const mask = buildForegroundMask(makeDepth([0.2, 0.8]), 0.5, 1)
 
     expect(Array.from(mask)).toEqual([0, 0])
+  })
+})
+
+describe('erodeForegroundMask', () => {
+  it('shrinks the fill region by the requested radius', () => {
+    const width = 7
+    const height = 7
+    const mask = new Uint8Array(width * height).fill(255)
+    for (let y = 1; y <= 5; y += 1) {
+      for (let x = 1; x <= 5; x += 1) mask[y * width + x] = 0
+    }
+
+    const eroded = erodeForegroundMask(mask, width, height, 1)
+
+    expect(eroded[1 * width + 1]).toBe(255)
+    expect(eroded[1 * width + 3]).toBe(255)
+    expect(eroded[2 * width + 2]).toBe(0)
+    expect(eroded[3 * width + 3]).toBe(0)
+  })
+
+  it('keeps foreground that touches the image border', () => {
+    const mask = new Uint8Array(9)
+    const eroded = erodeForegroundMask(mask, 3, 3, 1)
+
+    expect(Array.from(eroded)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0])
+  })
+
+  it('returns the mask unchanged for a zero radius', () => {
+    const mask = new Uint8Array([0, 255, 0])
+    expect(erodeForegroundMask(mask, 3, 1, 0)).toBe(mask)
   })
 })
 

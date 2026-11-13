@@ -95,8 +95,8 @@ PNG）在 WASM 回退下每个视口约 13 秒；桌面 + 375px 移动端全套�
 
 构建产物（生产构建）：
 
-- 首屏 JS：**78.5 KB gzip**，CSS 5.1 KB。
-- 懒加载 Three.js 舞台：**134.7 KB gzip**。
+- 首屏 JS：**78.8 KB gzip**，CSS 5.1 KB。
+- 懒加载 Three.js 舞台：**136.3 KB gzip**。
 - 深度 Worker chunk：未压缩 1.29 MB，仅在图片就绪后加载。
 - 自托管权重：共 **139.0 MB**——Depth Anything V2 Small 46.4 MB（WebGPU 用
   q4f16 19.1 MB，WASM 用 q8 27.3 MB）+ LaMa 补全模型 92.6 MB。
@@ -136,9 +136,9 @@ LaMa 补全在深度完成后用 CPU（WASM）运行。本机本地预览首次�
 GitHub Pages 线上版约 **147 秒**。会话会留在 Worker 中，后续图片跳过下载和
 模型初始化。补全只合成到前景遮罩内，背景其余部分保持原图。
 
-- 测试：122 个单元/组件测试，14 个 E2E（桌面 Chromium、375px Chromium 含真实
+- 测试：130 个单元/组件测试，14 个 E2E（桌面 Chromium、375px Chromium 含真实
   模型深度/导出流程、375px WebKit 子集）。
-- 覆盖率：`src/lib` 与 `src/hooks` 范围内语句 94.2% / 分支 85.0%。WebGL、
+- 覆盖率：`src/lib` 与 `src/hooks` 范围内语句 94.9% / 分支 86.3%。WebGL、
   Worker 和下载胶水代码不在覆盖率分母内，由 E2E 覆盖。
 
 首屏保持在 200 KB gzip 预算内。
