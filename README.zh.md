@@ -137,7 +137,7 @@ LaMa 补全在深度完成后用 CPU（WASM）运行。本机本地预览首次�
 GitHub Pages 线上版约 **147 秒**。会话会留在 Worker 中，后续图片跳过下载和
 模型初始化。补全只合成到前景遮罩内，背景其余部分保持原图。
 
-- 测试：133 个单元/组件测试，14 个 E2E（桌面 Chromium、375px Chromium 含真实
+- 测试：136 个单元/组件测试，14 个 E2E（桌面 Chromium、375px Chromium 含真实
   模型深度/导出流程、375px WebKit 子集）。
 - 覆盖率：`src/lib` 与 `src/hooks` 范围内语句 95.1% / 分支 86.8%。WebGL、
   Worker 和下载胶水代码不在覆盖率分母内，由 E2E 覆盖。

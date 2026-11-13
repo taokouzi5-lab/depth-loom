@@ -202,6 +202,22 @@ function pullUp(levels: Level[], fallback: [number, number, number]): void {
 }
 
 /**
+ * Convert a foreground mask canvas's alpha channel into the push-pull keep
+ * mask. The canvas uses alpha 255 for foreground; the fill treats 255 as a
+ * usable background source, so the value must be inverted. Getting this wrong
+ * turns the fallback plate into a smear of the foreground itself.
+ */
+export function foregroundAlphaToKeepMask(
+  alpha: Uint8ClampedArray,
+): Uint8Array {
+  const keepMask = new Uint8Array(Math.floor(alpha.length / 4))
+  for (let index = 0; index < keepMask.length; index += 1) {
+    keepMask[index] = alpha[index * 4 + 3] >= 128 ? 0 : 255
+  }
+  return keepMask
+}
+
+/**
  * Fill the depth values under a foreground mask with the surrounding
  * background depth. The displaced background mesh must not inherit the
  * foreground's depth, or it would bulge towards the camera where the cutout

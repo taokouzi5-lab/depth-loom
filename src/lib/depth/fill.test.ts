@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createPushPullFill, fillDepthWithBackground } from './fill'
+import {
+  createPushPullFill,
+  fillDepthWithBackground,
+  foregroundAlphaToKeepMask,
+} from './fill'
 
 function makeImage(
   pixels: Array<[number, number, number]>,
@@ -15,6 +19,16 @@ function makeImage(
   })
   return { data, width, height }
 }
+
+describe('foregroundAlphaToKeepMask', () => {
+  it('inverts foreground alpha into the fill keep mask', () => {
+    const alpha = new Uint8ClampedArray([255, 200, 100, 0].flatMap((a) => [0, 0, 0, a]))
+
+    const keep = foregroundAlphaToKeepMask(alpha)
+
+    expect(Array.from(keep)).toEqual([0, 0, 255, 255])
+  })
+})
 
 describe('createPushPullFill', () => {
   it('fills a hole with the nearest background colour', () => {

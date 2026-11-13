@@ -12,6 +12,7 @@ import {
   createPushPullFill,
   FILL_MAX_WIDTH,
   fillDepthWithBackground,
+  foregroundAlphaToKeepMask,
 } from '../depth/fill'
 
 /**
@@ -185,11 +186,7 @@ function createInpaintedFill(
     source.height,
   )
 
-  const keepMask = new Uint8Array(source.width * source.height)
-  for (let index = 0; index < keepMask.length; index += 1) {
-    keepMask[index] = maskImage.data[index * 4 + 3]
-  }
-
+  const keepMask = foregroundAlphaToKeepMask(maskImage.data)
   const filled = createPushPullFill(sourceImage, keepMask, FILL_MAX_WIDTH)
   if (!filled) return null
 
@@ -273,11 +270,7 @@ export function createBackgroundDepth(
   const context = mask.getContext('2d')
   if (!context) return null
   const image = context.getImageData(0, 0, depth.width, depth.height)
-  const keepMask = new Uint8Array(depth.width * depth.height)
-  for (let index = 0; index < keepMask.length; index += 1) {
-    keepMask[index] = image.data[index * 4 + 3]
-  }
-
+  const keepMask = foregroundAlphaToKeepMask(image.data)
   const data = fillDepthWithBackground(depth, keepMask)
   if (!data) return null
   return { data, width: depth.width, height: depth.height }

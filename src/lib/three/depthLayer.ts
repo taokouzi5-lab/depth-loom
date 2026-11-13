@@ -24,8 +24,11 @@ import {
 export type StageView = 'original' | '3d'
 
 // The foreground matte must extend past the occluded-side fill, otherwise the
-// inpainted plate shows through the feathered edge as a halo at rest.
-const MASK_DILATION = 3
+// inpainted plate shows through the feathered edge as a halo at rest. The
+// plate fill itself extends a ring beyond the mask so object pixels just
+// outside the threshold cannot be duplicated behind the moving card.
+const MASK_DILATION = 5
+const PLATE_FILL_DILATION = 6
 const BACKGROUND_TINT = 0xffffff
 
 export class DepthLayer {
@@ -134,12 +137,12 @@ export class DepthLayer {
     )
     if (!foregroundTexture) return
 
-    // Fill only up to the Otsu edge, not the dilated matte: the extra ring is
-    // under the feathered foreground at rest, and fill there would show
-    // through as a halo before any AI result arrives.
+    // The fallback plate erases a ring beyond the Otsu edge; the extra ring is
+    // still under the dilated, feathered foreground at rest.
+    const fillMask = dilateMaskCanvas(mask, PLATE_FILL_DILATION) ?? mask
     const backgroundCanvas =
       this.aiBackgroundCanvas ??
-      createBackgroundCanvas(this.sourceCanvas, mask)
+      createBackgroundCanvas(this.sourceCanvas, fillMask)
     const aspect = this.sourceCanvas.width / this.sourceCanvas.height
     this.backgroundGeometry = createImagePlaneGeometry(aspect)
     this.foregroundGeometry = createImagePlaneGeometry(aspect)

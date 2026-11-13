@@ -156,7 +156,7 @@ in the worker, so later images skip the download and model init. The fill is
 composited only inside the foreground mask; the rest of the plate is the
 untouched photo.
 
-- Test suite: 133 unit/component tests and 14 E2E tests (desktop Chromium, 375px
+- Test suite: 136 unit/component tests and 14 E2E tests (desktop Chromium, 375px
   Chromium with the real-model depth/export flow, and a 375px WebKit subset).
 - Coverage: 95.1% statements / 86.8% branches over `src/lib` and `src/hooks`.
   WebGL, worker, and download glue are excluded from the coverage denominator and

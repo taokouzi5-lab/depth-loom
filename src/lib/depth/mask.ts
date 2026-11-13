@@ -150,6 +150,40 @@ export function erodeForegroundMask(
   return eroded
 }
 
+/**
+ * Grow the fill (foreground) region by a radius. Depth edges are soft, so
+ * object pixels regularly sit just outside the thresholded mask; if the plate
+ * kept them, they would be duplicated behind the foreground card as soon as
+ * the cards separate.
+ */
+export function dilateForegroundMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  radius: number,
+): Uint8Array {
+  if (radius <= 0) return mask
+
+  const dilated = new Uint8Array(mask)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (mask[y * width + x] !== 0) continue
+
+      for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
+        const neighbourY = y + offsetY
+        if (neighbourY < 0 || neighbourY >= height) continue
+        for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
+          if (offsetX * offsetX + offsetY * offsetY > radius * radius) continue
+          const neighbourX = x + offsetX
+          if (neighbourX < 0 || neighbourX >= width) continue
+          dilated[neighbourY * width + neighbourX] = 0
+        }
+      }
+    }
+  }
+  return dilated
+}
+
 /** Nearest-neighbour upscale of a depth-resolution mask to image resolution. */
 export function upsampleMask(
   mask: Uint8Array,

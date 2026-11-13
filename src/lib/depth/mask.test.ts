@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildForegroundMask,
   computeDepthThreshold,
+  dilateForegroundMask,
   erodeForegroundMask,
   upsampleMask,
 } from './mask'
@@ -72,6 +73,21 @@ describe('erodeForegroundMask', () => {
   it('returns the mask unchanged for a zero radius', () => {
     const mask = new Uint8Array([0, 255, 0])
     expect(erodeForegroundMask(mask, 3, 1, 0)).toBe(mask)
+  })
+})
+
+describe('dilateForegroundMask', () => {
+  it('grows the fill region into neighbouring background', () => {
+    const mask = new Uint8Array([255, 255, 0, 255, 255])
+
+    const dilated = dilateForegroundMask(mask, 5, 1, 1)
+
+    expect(Array.from(dilated)).toEqual([255, 0, 0, 0, 255])
+  })
+
+  it('returns the mask unchanged for a zero radius', () => {
+    const mask = new Uint8Array([0, 255, 0])
+    expect(dilateForegroundMask(mask, 3, 1, 0)).toBe(mask)
   })
 })
 

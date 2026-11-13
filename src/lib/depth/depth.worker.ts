@@ -4,6 +4,7 @@ import { createPushPullFill } from './fill'
 import {
   buildForegroundMask,
   computeDepthThreshold,
+  dilateForegroundMask,
   erodeForegroundMask,
 } from './mask'
 import { normalizeDepth } from './normalize'
@@ -56,6 +57,10 @@ const INPAINT_DILATION = 1
 // colours instead of the object's own edge pixels (which would read as a dark
 // echo) or AI texture (which is unreliable when the hole is large).
 const INPAINT_EDGE_GUARD = 16
+// The plate also erases a ring outside the thresholded mask. Otsu is soft, so
+// object pixels often sit just outside it; leaving them in the plate duplicates
+// e.g. an eye or a lock of hair once the foreground card moves.
+const INPAINT_EDGE_EXTENSION = 6
 
 function post(message: DepthWorkerResponse, transfer?: Transferable[]): void {
   scope.postMessage(message, transfer)
@@ -367,6 +372,12 @@ async function runInpainting(
     depthHeight,
     INPAINT_EDGE_GUARD,
   )
+  const extensionMask = dilateForegroundMask(
+    lowMask,
+    depthWidth,
+    depthHeight,
+    INPAINT_EDGE_EXTENSION,
+  )
 
   const session = await getInpaintSession(
     request.requestId,
@@ -460,6 +471,8 @@ async function runInpainting(
   // Background extension for the guard band. The band sits under the opaque
   // matte at rest, but when the foreground card moves it is exposed; keeping
   // the original object pixels there looks like a dark echo of the object.
+  // Sources and the filled area both use the dilated mask, so the extension
+  // never samples (or leaves behind) the object's own edge colours.
   const keepMask = new Uint8Array(imageWidth * imageHeight)
   for (let y = 0; y < imageHeight; y += 1) {
     const depthY = Math.min(
@@ -471,7 +484,8 @@ async function runInpainting(
         depthWidth - 1,
         Math.floor((x + 0.5) * depthPerPixelX),
       )
-      keepMask[y * imageWidth + x] = lowMask[depthY * depthWidth + depthX]
+      keepMask[y * imageWidth + x] =
+        extensionMask[depthY * depthWidth + depthX]
     }
   }
   const extension = createPushPullFill(
@@ -504,7 +518,7 @@ async function runInpainting(
       let blue = rgba[target + 2]
 
       const bandRaw = foregroundWeightAt(
-        lowMask,
+        extensionMask,
         depthWidth,
         depthHeight,
         (x + 0.5) * depthPerPixelX,
