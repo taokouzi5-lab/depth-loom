@@ -1,7 +1,15 @@
-import { LinearFilter, PlaneGeometry, SRGBColorSpace, CanvasTexture } from 'three'
+import {
+  CanvasTexture,
+  DataTexture,
+  LinearFilter,
+  PlaneGeometry,
+  RGBAFormat,
+  SRGBColorSpace,
+  UnsignedByteType,
+} from 'three'
 import { computeDepthThreshold } from '../depth/mask'
 import type { DepthMap } from '../depth/protocol'
-import { createPushPullFill, FILL_MAX_WIDTH } from './fill'
+import { createPushPullFill, FILL_MAX_WIDTH } from '../depth/fill'
 
 /** Foreground/background separation in world units at strength 1. */
 export const LAYER_SEPARATION = 0.035
@@ -74,26 +82,57 @@ export function createFillMaskCanvas(
 }
 
 /**
- * The original photo with everything outside the foreground mask removed.
- * The mask is scaled with a small blur so the cutout edge is not a hard stair.
+ * Foreground cutout as a data texture: RGB always comes from the photo,
+ * alpha from the blurred mask. Building this from a canvas with
+ * `destination-in` lets the browser unpremultiply nearly transparent edge
+ * pixels, which turns their colour into bright garbage that filtering then
+ * pulls into the visible silhouette as a halo. RGBA bytes uploaded directly
+ * keep the edge colour identical to the photo.
  */
-export function createForegroundCanvas(
+export function createForegroundTexture(
   source: HTMLCanvasElement,
   mask: HTMLCanvasElement,
-): HTMLCanvasElement | null {
-  const canvas = document.createElement('canvas')
-  canvas.width = source.width
-  canvas.height = source.height
-  const context = canvas.getContext('2d')
-  if (!context) return null
+): DataTexture | null {
+  const width = source.width
+  const height = source.height
+  const sourceContext = source.getContext('2d')
+  if (!sourceContext) return null
+  const sourceImage = sourceContext.getImageData(0, 0, width, height)
 
-  context.drawImage(source, 0, 0)
-  context.globalCompositeOperation = 'destination-in'
-  context.filter = 'blur(3px)'
-  context.drawImage(mask, 0, 0, canvas.width, canvas.height)
-  context.filter = 'none'
-  context.globalCompositeOperation = 'source-over'
-  return canvas
+  const maskCanvas = document.createElement('canvas')
+  maskCanvas.width = width
+  maskCanvas.height = height
+  const maskContext = maskCanvas.getContext('2d')
+  if (!maskContext) return null
+  maskContext.filter = 'blur(3px)'
+  maskContext.drawImage(mask, 0, 0, width, height)
+  maskContext.filter = 'none'
+  const maskImage = maskContext.getImageData(0, 0, width, height)
+
+  const data = new Uint8Array(width * height * 4)
+  for (let index = 0; index < width * height; index += 1) {
+    const offset = index * 4
+    data[offset] = sourceImage.data[offset]
+    data[offset + 1] = sourceImage.data[offset + 1]
+    data[offset + 2] = sourceImage.data[offset + 2]
+    data[offset + 3] = maskImage.data[offset + 3]
+  }
+
+  const texture = new DataTexture(
+    data,
+    width,
+    height,
+    RGBAFormat,
+    UnsignedByteType,
+  )
+  texture.colorSpace = SRGBColorSpace
+  // DataTexture defaults to flipY = false; the source canvas is top-down.
+  texture.flipY = true
+  texture.minFilter = LinearFilter
+  texture.magFilter = LinearFilter
+  texture.generateMipmaps = false
+  texture.needsUpdate = true
+  return texture
 }
 
 /**

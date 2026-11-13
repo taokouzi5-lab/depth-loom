@@ -95,7 +95,7 @@ chunk (M2) is loaded only when an image is ready.
 - Inference: target < 5 s WebGPU, < 15 s WASM on a mid-range laptop
 - Render on demand: no `requestAnimationFrame` loop while idle
 
-Measured build: initial JS 78.8 KB gzip, CSS 5.1 KB, lazy stage 136.3 KB gzip,
+Measured build: initial JS 78.8 KB gzip, CSS 5.1 KB, lazy stage 136.4 KB gzip,
 depth worker 1.29 MB uncompressed.
 
 Measured depth pipeline on the same machine (i7-12700H, 15.8 GB RAM), local

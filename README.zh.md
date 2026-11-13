@@ -96,7 +96,7 @@ PNG）在 WASM 回退下每个视口约 13 秒；桌面 + 375px 移动端全套�
 构建产物（生产构建）：
 
 - 首屏 JS：**78.8 KB gzip**，CSS 5.1 KB。
-- 懒加载 Three.js 舞台：**136.3 KB gzip**。
+- 懒加载 Three.js 舞台：**136.4 KB gzip**。
 - 深度 Worker chunk：未压缩 1.29 MB，仅在图片就绪后加载。
 - 自托管权重：共 **139.0 MB**——Depth Anything V2 Small 46.4 MB（WebGPU 用
   q4f16 19.1 MB，WASM 用 q8 27.3 MB）+ LaMa 补全模型 92.6 MB。

@@ -1,5 +1,6 @@
 ﻿import { env, pipeline, RawImage } from '@huggingface/transformers'
 import * as ort from 'onnxruntime-web/all'
+import { createPushPullFill } from './fill'
 import {
   buildForegroundMask,
   computeDepthThreshold,
@@ -48,11 +49,13 @@ let queue = Promise.resolve()
 const INPAINT_MODEL = 'lama/inpainting_lama_2025jan.onnx'
 const INPAINT_SIZE = 512
 const INPAINT_DILATION = 1
-// The renderer's matte is the Otsu mask dilated by 3 depth pixels and blurred,
-// so its semi-transparent band reaches ~6 px inside the silhouette. Keep
-// generated pixels out of that band: the plate under the feather must remain
-// the original photo, otherwise the two blend into a haze ring at rest.
-const INPAINT_EDGE_GUARD = 6
+// At the maximum yaw the foreground card moves by roughly 25 image px, so the
+// plate needs a background-coloured band at least that wide behind the
+// silhouette. Generated pixels start this far inside the mask; the exposed
+// band is filled from surrounding background colours instead of the object's
+// own edge pixels (which would read as a dark echo) or AI texture (which is
+// unreliable when the hole is large).
+const INPAINT_EDGE_GUARD = 24
 
 function post(message: DepthWorkerResponse, transfer?: Transferable[]): void {
   scope.postMessage(message, transfer)
@@ -297,6 +300,50 @@ function foregroundWeightAt(
   return top * (1 - fy) + bottom * fy
 }
 
+interface RgbaView {
+  data: Uint8ClampedArray
+  width: number
+  height: number
+}
+
+/** Bilinear sample of a low-resolution RGBA view at an image-space pixel. */
+function sampleRgba(
+  view: RgbaView,
+  x: number,
+  y: number,
+  imageWidth: number,
+  imageHeight: number,
+): [number, number, number] {
+  const sourceX = clamp(
+    ((x + 0.5) / imageWidth) * view.width - 0.5,
+    0,
+    view.width - 1,
+  )
+  const sourceY = clamp(
+    ((y + 0.5) / imageHeight) * view.height - 0.5,
+    0,
+    view.height - 1,
+  )
+  const x0 = Math.floor(sourceX)
+  const y0 = Math.floor(sourceY)
+  const x1 = Math.min(view.width - 1, x0 + 1)
+  const y1 = Math.min(view.height - 1, y0 + 1)
+  const fx = sourceX - x0
+  const fy = sourceY - y0
+  const sample = (px: number, py: number, channel: number): number =>
+    view.data[(py * view.width + px) * 4 + channel]
+
+  const channels: [number, number, number] = [0, 0, 0]
+  for (let channel = 0; channel < 3; channel += 1) {
+    const top =
+      sample(x0, y0, channel) * (1 - fx) + sample(x1, y0, channel) * fx
+    const bottom =
+      sample(x0, y1, channel) * (1 - fx) + sample(x1, y1, channel) * fx
+    channels[channel] = top * (1 - fy) + bottom * fy
+  }
+  return channels
+}
+
 async function runInpainting(
   request: DepthEstimateRequest,
   depthData: Float32Array,
@@ -410,6 +457,28 @@ async function runInpainting(
   const result = output.output ?? Object.values(output)[0]
   const data = result.data as Float32Array
 
+  // Background extension for the guard band. The band sits under the opaque
+  // matte at rest, but when the foreground card moves it is exposed; keeping
+  // the original object pixels there looks like a dark echo of the object.
+  const keepMask = new Uint8Array(imageWidth * imageHeight)
+  for (let y = 0; y < imageHeight; y += 1) {
+    const depthY = Math.min(
+      depthHeight - 1,
+      Math.floor((y + 0.5) * depthPerPixelY),
+    )
+    for (let x = 0; x < imageWidth; x += 1) {
+      const depthX = Math.min(
+        depthWidth - 1,
+        Math.floor((x + 0.5) * depthPerPixelX),
+      )
+      keepMask[y * imageWidth + x] = lowMask[depthY * depthWidth + depthX]
+    }
+  }
+  const extension = createPushPullFill(
+    { data: rgba, width: imageWidth, height: imageHeight },
+    keepMask,
+  )
+
   const background = new Uint8ClampedArray(rgba)
   for (let y = top; y < bottom; y += 1) {
     const outputY = clamp(
@@ -429,6 +498,32 @@ async function runInpainting(
       const x0 = Math.floor(outputX)
       const x1 = Math.min(size - 1, x0 + 1)
       const fx = outputX - x0
+      const target = (y * imageWidth + x) * 4
+      let red = rgba[target]
+      let green = rgba[target + 1]
+      let blue = rgba[target + 2]
+
+      const bandRaw = foregroundWeightAt(
+        lowMask,
+        depthWidth,
+        depthHeight,
+        (x + 0.5) * depthPerPixelX,
+        (y + 0.5) * depthPerPixelY,
+      )
+      if (extension && bandRaw > 0) {
+        const band = bandRaw * bandRaw * (3 - 2 * bandRaw)
+        const [extensionRed, extensionGreen, extensionBlue] = sampleRgba(
+          extension,
+          x,
+          y,
+          imageWidth,
+          imageHeight,
+        )
+        red = red * (1 - band) + extensionRed * band
+        green = green * (1 - band) + extensionGreen * band
+        blue = blue * (1 - band) + extensionBlue * band
+      }
+
       const alphaRaw = foregroundWeightAt(
         fillMask,
         depthWidth,
@@ -436,22 +531,26 @@ async function runInpainting(
         (x + 0.5) * depthPerPixelX,
         (y + 0.5) * depthPerPixelY,
       )
-      if (alphaRaw <= 0) continue
-      const alpha = alphaRaw * alphaRaw * (3 - 2 * alphaRaw)
-      const target = (y * imageWidth + x) * 4
-
-      for (let channel = 0; channel < 3; channel += 1) {
-        const topValue =
-          data[channel * size * size + y0 * size + x0] * (1 - fx) +
-          data[channel * size * size + y0 * size + x1] * fx
-        const bottomValue =
-          data[channel * size * size + y1 * size + x0] * (1 - fx) +
-          data[channel * size * size + y1 * size + x1] * fx
-        const generated = topValue * (1 - fy) + bottomValue * fy
-        background[target + channel] = Math.round(
-          rgba[target + channel] * (1 - alpha) + generated * alpha,
-        )
+      if (alphaRaw > 0) {
+        const alpha = alphaRaw * alphaRaw * (3 - 2 * alphaRaw)
+        const generated: [number, number, number] = [0, 0, 0]
+        for (let channel = 0; channel < 3; channel += 1) {
+          const topValue =
+            data[channel * size * size + y0 * size + x0] * (1 - fx) +
+            data[channel * size * size + y0 * size + x1] * fx
+          const bottomValue =
+            data[channel * size * size + y1 * size + x0] * (1 - fx) +
+            data[channel * size * size + y1 * size + x1] * fx
+          generated[channel] = topValue * (1 - fy) + bottomValue * fy
+        }
+        red = red * (1 - alpha) + generated[0] * alpha
+        green = green * (1 - alpha) + generated[1] * alpha
+        blue = blue * (1 - alpha) + generated[2] * alpha
       }
+
+      background[target] = Math.round(red)
+      background[target + 1] = Math.round(green)
+      background[target + 2] = Math.round(blue)
     }
   }
 

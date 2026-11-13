@@ -4,6 +4,7 @@ import {
   MeshBasicMaterial,
   type CanvasTexture,
   type PlaneGeometry,
+  type Texture,
 } from 'three'
 import type { DepthMap } from '../depth/protocol'
 import { YAW_LIMIT } from './orbit'
@@ -11,7 +12,7 @@ import {
   computeLayerThreshold,
   createBackgroundCanvas,
   createFillMaskCanvas,
-  createForegroundCanvas,
+  createForegroundTexture,
   createLayerGeometry,
   createLayerTexture,
   createMaskCanvas,
@@ -36,7 +37,7 @@ export class DepthLayer {
   private readonly layerGroup = new Group()
   private layerGeometry: PlaneGeometry | null = null
   private backgroundTexture: CanvasTexture | null = null
-  private foregroundTexture: CanvasTexture | null = null
+  private foregroundTexture: Texture | null = null
   private readonly layerMaterials: MeshBasicMaterial[] = []
   private backgroundMesh: Mesh | null = null
   private foregroundMesh: Mesh | null = null
@@ -124,11 +125,11 @@ export class DepthLayer {
     if (!mask || !fillMask) return
 
     const expandedMask = dilateMaskCanvas(mask, MASK_DILATION) ?? mask
-    const foregroundCanvas = createForegroundCanvas(
+    const foregroundTexture = createForegroundTexture(
       this.sourceCanvas,
       expandedMask,
     )
-    if (!foregroundCanvas) return
+    if (!foregroundTexture) return
 
     // Fill only up to the Otsu edge, not the dilated matte, and never the
     // outer frame: the frame is foreground-card-only, so filling it would
@@ -143,7 +144,7 @@ export class DepthLayer {
     this.backgroundTexture = backgroundCanvas
       ? createLayerTexture(backgroundCanvas)
       : null
-    this.foregroundTexture = createLayerTexture(foregroundCanvas)
+    this.foregroundTexture = foregroundTexture
 
     const backgroundMaterial = new MeshBasicMaterial({
       map: this.backgroundTexture ?? this.imageTexture,
